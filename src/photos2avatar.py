@@ -596,7 +596,7 @@ def main():
     avatar = Avatar(measurements, input_gender_glob)
     # Impute missing measurements
     _ = avatar.predict()
-    # Create the 3D avatar
+    # Create the 3D avatarR
     avatar.create_obj_file(ava_name=f'avatar_{input_gender_glob}_fromImg')
     # Measure the 3D avatar (to compare with the input measurements)
     _ = avatar.measure(out_meas_name=f"output_data_avatar_{input_gender_glob}_fromImg")

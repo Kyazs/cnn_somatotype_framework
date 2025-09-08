@@ -346,17 +346,14 @@ class Avatar:
 
         self.output_data = self.calc_measurements(cp, facets)
 
-
-        if save_file == True:
-            
-            if out_meas_name == None:
+        if save_file:
+            if out_meas_name is None:
                 meas_dir = os.path.join(OUTPUT_FILES_DIR, f"output_data_avatar_{self.gender}.csv")
             else:
                 meas_dir = os.path.join(OUTPUT_FILES_DIR, f"{out_meas_name}.csv")
             
             ## Create output file
-            with open(meas_dir, "w") as file:
-
+            with open(meas_dir, "w", encoding="utf-8") as file:
                 file.write(
                     "_______________________________________________________________________________\n"
                 )
@@ -374,7 +371,6 @@ class Avatar:
                 )
 
                 for i, meas in enumerate(MEASUREMENTS):
-
                     if abs(self.output_data[i]) < 1e-10:
                         rel_err = None  # Or any other value you prefer
                     else:

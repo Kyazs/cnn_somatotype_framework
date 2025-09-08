@@ -23,7 +23,7 @@ To get a local copy of the project, follow these steps:
 virtualenv venv
 ```
 ### 4-Activate the virtual environment:
-
+`.\.venv\[venv name]\Scripts\Activate`
 ```bash
 source venv/bin/activate
 ```
