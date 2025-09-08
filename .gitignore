@@ -1,7 +1,7 @@
 # Ignore specific files in data and its subfolders
 data/**/*.npy
 data/**/*.npz
-data/**/*.pkl
+# data/**/*.pkl
 data/**/*.keras
 # data/**/*.h5
 # data/**/*.obj

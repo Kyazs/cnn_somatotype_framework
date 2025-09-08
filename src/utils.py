@@ -138,6 +138,34 @@ TEST_FILES = True
 TEST_FILES_NUM = 100
 
 ##################################
+## Somatotype System Constants ##
+##################################
+
+# Somatotype measurement names (8 total)
+SOMATOTYPE_MEASUREMENTS = [
+    'triceps_skinfold_mm',
+    'subscapular_skinfold_mm', 
+    'suprailiac_skinfold_mm',
+    'calf_skinfold_mm',
+    'humerus_biepicondylar_breadth_cm',
+    'femur_biepicondylar_breadth_cm',
+    'arm_circumference_flexed_cm',
+    'calf_circumference_cm'
+]
+
+# Somatotype categories
+SOMATOTYPE_CATEGORIES = {
+    'skinfolds': ['triceps_skinfold_mm', 'subscapular_skinfold_mm', 
+                  'suprailiac_skinfold_mm', 'calf_skinfold_mm'],
+    'bone_breadths': ['humerus_biepicondylar_breadth_cm', 'femur_biepicondylar_breadth_cm'],
+    'circumferences': ['arm_circumference_flexed_cm', 'calf_circumference_cm']
+}
+
+# CAESAR dataset information
+CAESAR_DATASETS = ['CAESAR_enhanced', 'CAESAR_somatotype']
+CAESAR_GENDERS = ['female', 'male']
+
+##################################
 
 def load_input_data():
     '''

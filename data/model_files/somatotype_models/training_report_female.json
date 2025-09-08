@@ -1,0 +1,107 @@
+{
+  "training_date": "2025-09-09T01:01:22.449336",
+  "gender": "female",
+  "dataset_info": {
+    "total_subjects": 1256,
+    "available_targets": 2,
+    "available_predictors": 9
+  },
+  "model_performance": {
+    "triceps_skinfold_mm": {
+      "model_type": "Ridge",
+      "cv_r2": 0.6147624474164702,
+      "test_r2": 0.6451196918232286,
+      "test_mae": 4.247108713208305,
+      "test_rmse": 5.400573999473625,
+      "n_samples": 1256,
+      "n_features": 7,
+      "predictors": [
+        "Thigh Circumference",
+        "Weight",
+        "Chest Circumference",
+        "Armscye Circumference",
+        "Shoulder Breadth",
+        "Ankle Circumference",
+        "Crotch Height"
+      ]
+    },
+    "subscapular_skinfold_mm": {
+      "model_type": "ElasticNet",
+      "cv_r2": 0.6944660182457596,
+      "test_r2": 0.712994370840782,
+      "test_mae": 4.792378136961077,
+      "test_rmse": 6.048048056052783,
+      "n_samples": 1256,
+      "n_features": 7,
+      "predictors": [
+        "Chest Circumference",
+        "Weight",
+        "Armscye Circumference",
+        "Thigh Circumference",
+        "Shoulder Breadth",
+        "Ankle Circumference",
+        "Crotch Height"
+      ]
+    }
+  },
+  "training_plan": {
+    "triceps_skinfold_mm": {
+      "target_column": "Triceps Skinfold",
+      "predictors": [
+        "Thigh Circumference",
+        "Weight",
+        "Chest Circumference",
+        "Armscye Circumference",
+        "Shoulder Breadth",
+        "Ankle Circumference",
+        "Crotch Height"
+      ],
+      "correlations": {
+        "Thigh Circumference": 0.7519169358042328,
+        "Weight": 0.7353361435809255,
+        "Chest Circumference": 0.7150967147795694,
+        "Armscye Circumference": 0.6689774387688522,
+        "Shoulder Breadth": 0.582499507403299,
+        "Ankle Circumference": 0.4382693959585462,
+        "Crotch Height": 0.13202086498405471,
+        "Knee Height": 0.09534828113017765
+      },
+      "sample_size": 1256,
+      "target_stats": {
+        "mean": 23.518471337579616,
+        "std": 9.50800842841838,
+        "min": 3.5,
+        "max": 64.0
+      }
+    },
+    "subscapular_skinfold_mm": {
+      "target_column": "Subscapular Skinfold",
+      "predictors": [
+        "Chest Circumference",
+        "Weight",
+        "Armscye Circumference",
+        "Thigh Circumference",
+        "Shoulder Breadth",
+        "Ankle Circumference",
+        "Crotch Height"
+      ],
+      "correlations": {
+        "Chest Circumference": 0.8149144199299718,
+        "Weight": 0.7737210747927277,
+        "Armscye Circumference": 0.7534883692722355,
+        "Thigh Circumference": 0.7147610181299482,
+        "Shoulder Breadth": 0.6586788897993227,
+        "Ankle Circumference": 0.4456906852061643,
+        "Crotch Height": 0.17943476715947076,
+        "Knee Height": 0.06308473382480025
+      },
+      "sample_size": 1256,
+      "target_stats": {
+        "mean": 21.270063694267517,
+        "std": 11.675141105638824,
+        "min": 4.0,
+        "max": 64.0
+      }
+    }
+  }
+}

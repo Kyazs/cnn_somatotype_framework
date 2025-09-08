@@ -48,8 +48,9 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-# Import Avatar class containing the 3D avatar generation methods (Reshaper and Imputer modules)
+# Import Avatar classes containing the 3D avatar generation methods (Reshaper and Imputer modules)
 from reshaper.avatar import Avatar
+from reshaper.avatar_somatotype import AvatarSomatotype
 
 # Constants
 IMG_RESIZE = 448  # 512   #512   # 256
@@ -588,20 +589,45 @@ def main():
         print("Please, check the silhouettes images size - it must be 224x224 px (IMG_SIZE_4NN in utils.py). Check input_info.")
         sys.exit(1)
 
-    print("[4] Starting to create the 3D avatar.")
+    print("[4] Starting somatotype measurement prediction.")
     start = time.time()
 
     measurements = create_measurements_array(extracted_measurements, weightkg_glob)
 
-    avatar = Avatar(measurements, input_gender_glob)
-    # Impute missing measurements
-    _ = avatar.predict()
-    # Create the 3D avatarR
-    avatar.create_obj_file(ava_name=f'avatar_{input_gender_glob}_fromImg')
-    # Measure the 3D avatar (to compare with the input measurements)
-    _ = avatar.measure(out_meas_name=f"output_data_avatar_{input_gender_glob}_fromImg")
-
-    print(f"[4] Finished creating the 3D avatar in {(time.time() - start):.1f} s")
+    # Create enhanced avatar with somatotype capabilities (measurement only)
+    avatar = AvatarSomatotype(measurements, input_gender_glob, enable_somatotype=True)
+    
+    # Impute missing measurements and get somatotype predictions
+    complete_results = avatar.predict_complete(include_somatotype=True)
+    
+    # Save somatotype results to output folder
+    avatar.save_somatotype_results(complete_results, f"somatotype_measurements_fromImg")
+    
+    print(f"[4] Finished somatotype measurement prediction in {(time.time() - start):.1f} s")
+    
+    # Print summary of somatotype results
+    print("\n=== SOMATOTYPE RESULTS SUMMARY ===")
+    if complete_results.get('somatotype_measurements'):
+        print("Successfully predicted somatotype measurements:")
+        for measurement, value in complete_results['somatotype_measurements'].items():
+            if value is not None:
+                confidence = complete_results.get('confidence_scores', {}).get(measurement, 0)
+                unit = 'mm' if 'skinfold' in measurement else 'cm'
+                print(f"  • {measurement.replace('_', ' ').title()}: {value:.1f} {unit} (confidence: {confidence:.2f})")
+    
+    validation_status = complete_results.get('validation_status', {})
+    print(f"\nValidation Status: {validation_status.get('status', 'unknown')}")
+    if validation_status.get('warnings'):
+        print("Warnings:")
+        for warning in validation_status['warnings']:
+            print(f"  - {warning}")
+    
+    print(f"\nOutput files saved to: {OUTPUT_FILES_DIR}")
+    print("Files created:")
+    print(f"  - somatotype_measurements_fromImg_{input_gender_glob}.csv (detailed results)")
+    print(f"  - somatotype_measurements_fromImg_{input_gender_glob}_summary.txt (summary)")
+    
+    return complete_results
 
 #########################################################################################
 if __name__ == "__main__":

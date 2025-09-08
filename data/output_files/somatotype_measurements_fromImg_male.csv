@@ -1,0 +1,3 @@
+measurement_type,weight_kg,stature_cm,chest_girth_cm,waist_girth_cm,hips_buttock_girth_cm,gender,triceps_skinfold_mm,triceps_skinfold_mm_confidence,subscapular_skinfold_mm,subscapular_skinfold_mm_confidence,suprailiac_skinfold_mm,suprailiac_skinfold_mm_confidence,calf_skinfold_mm,calf_skinfold_mm_confidence,humerus_biepicondylar_breadth_cm,humerus_biepicondylar_breadth_cm_confidence,femur_biepicondylar_breadth_cm,femur_biepicondylar_breadth_cm_confidence,arm_circumference_flexed_cm,arm_circumference_flexed_cm_confidence,calf_circumference_cm,calf_circumference_cm_confidence
+base,75.15,166.25,111.75,94.79,100.64,male,,,,,,,,,,,,,,,,
+somatotype,,,,,,male,18.85,0.719,37.13,0.95,18.58,0.3,14.64,0.3,7.16,0.3,10.04,0.3,32.0,0.3,40.19,0.3
