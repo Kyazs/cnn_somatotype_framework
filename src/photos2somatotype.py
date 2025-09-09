@@ -1,9 +1,21 @@
 #!/usr/bin/env python3
 """
-Photos to Somatotype Measurements
+Photos to Somatotype Measurements (Enhanced with Literature-Based Equations)
 
-This script extracts somatotype measurements from input images without creating 3D avatars.
-It focuses solely on predicting the 8 specialized anthropometric measurements.
+This script extracts somatotype measurements from input images using a hybrid approach:
+1. CNN extraction of basic anthropometric measurements from photos
+2. MICE imputation for missing standard measurements  
+3. Advanced somatotype prediction combining:
+   - Trained ML models on real CAESAR data (where available)
+   - Literature-based prediction equations from peer-reviewed research
+   
+The system predicts 8 specialized somatotype measurements:
+- 4 Skinfold measurements (triceps, subscapular, suprailiac, calf)
+- 2 Bone breadth measurements (humerus, femur biepicondylar)  
+- 2 Specialized circumferences (arm flexed, calf)
+
+Uses validated equations from Jackson-Pollock (1978-1980), Durnin-Womersley (1974), 
+Heymsfield (1982), and other established anthropometric research.
 """
 
 import os

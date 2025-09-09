@@ -1,0 +1,48 @@
+=== SOMATOTYPE MEASUREMENT RESULTS ===
+
+Gender: male
+Processing Date: 2025-09-09 03:48:52.255971
+
+BASE MEASUREMENTS:
+  Weight: 75.2 kg
+  Stature: 166.2 cm
+  Chest Girth: 111.8 cm
+  Waist Girth: 94.8 cm
+  Hip Girth: 100.6 cm
+
+SOMATOTYPE MEASUREMENTS:
+
+Skinfold Measurements:
+  Triceps Skinfold Mm: 18.9 mm (confidence: 0.72)
+  Subscapular Skinfold Mm: 37.1 mm (confidence: 0.95)
+  Suprailiac Skinfold Mm: 18.6 mm (confidence: 0.30)
+  Calf Skinfold Mm: 14.6 mm (confidence: 0.30)
+
+Bone Breadth Measurements:
+  Humerus Biepicondylar Breadth Cm: 7.2 cm (confidence: 0.30)
+  Femur Biepicondylar Breadth Cm: 10.0 cm (confidence: 0.30)
+
+Specialized Circumferences:
+  Arm Circumference Flexed Cm: 32.0 cm (confidence: 0.30)
+  Calf Circumference Cm: 40.2 cm (confidence: 0.30)
+
+==================================================
+MODEL PERFORMANCE METRICS
+==================================================
+Based on CAESAR dataset training:
+
+Triceps Skinfold Mm:
+  Model Type: Ridge
+  R² Score: 0.419
+  Mean Absolute Error: 3.77
+  Training Samples: 1123
+  Features Used: 8
+
+Subscapular Skinfold Mm:
+  Model Type: Ridge
+  R² Score: 0.690
+  Mean Absolute Error: 4.69
+  Training Samples: 1123
+  Features Used: 7
+
+VALIDATION STATUS: success

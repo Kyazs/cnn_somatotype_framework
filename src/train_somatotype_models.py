@@ -9,8 +9,6 @@ This script will:
 4. Evaluate model performance with proper metrics
 5. Save trained models for production use
 
-Author: AI Assistant
-Date: September 2025
 """
 
 import os

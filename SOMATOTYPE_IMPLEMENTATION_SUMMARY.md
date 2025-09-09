@@ -21,10 +21,10 @@
 - Validation rules and output settings
 - Gender-specific defaults
 
-#### Testing Suite
+<!-- #### Testing Suite
 - **test_somatotype.py**: Comprehensive test system
 - **simple_somatotype_test.py**: Basic functionality test
-- **demo_somatotype.py**: Interactive demonstration
+- **demo_somatotype.py**: Interactive demonstration -->
 
 ### 2. Integration Points
 
@@ -64,8 +64,8 @@
 #### File Outputs
 - **CSV Files**: Detailed measurement data with confidence scores
 - **Summary Text**: Human-readable results organized by category
-- **3D Avatar**: Enhanced OBJ files with somatotype data
-- **Measurement Arrays**: NumPy format for further analysis
+<!-- - **3D Avatar**: Enhanced OBJ files with somatotype data -->
+<!-- - **Measurement Arrays**: NumPy format for further analysis -->
 
 #### Output Features
 - Configurable precision and formats
@@ -139,13 +139,13 @@ python photos2avatar.py
 # Now automatically generates somatotype measurements
 ```
 
-### Standalone Testing
+<!-- ### Standalone Testing
 ```bash
 # Test the system
 python simple_somatotype_test.py   # Basic test
 python test_somatotype.py          # Comprehensive test
 python demo_somatotype.py          # Interactive demo
-```
+``` -->
 
 ## Files Created/Modified
 
