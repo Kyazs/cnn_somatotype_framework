@@ -54,7 +54,10 @@ MEASUREMENTS = ['weight_kg',  # 'height_cm', 'weight_kg
                 'waistback_length',
                 'thigh_length',
                 'chest_depth_length',
-                'head_girth']
+                'head_girth',
+                # for somatotype predictors
+                'biacromialbreadth',
+                'scyecircoveracromion']
 
 M_NUM = len(MEASUREMENTS)
 
@@ -84,7 +87,10 @@ MEAS_LABELS = { 'stature_cm': 1,
                 'waistback_length': 3,
                 'thigh_length': 3,   #3,
                 'chest_depth_length': 3,
-                'head_girth': 2}
+                'head_girth': 2,
+                # for somatotype predictors
+                'biacromialbreadth': 3,  # point to point length (shoulder breadth)
+                'scyecircoveracromion': 2}  # girth measurement
 
 # KHUMANBODY_DENSITY = 1026.0   # 3DHBSh
 # 1 010 kilograms [kg] of human body fit into 1 cubic meter
@@ -125,6 +131,12 @@ UK_MEAS = [
     'waistback_length',
     "shoulder_girth",
     'crotchheight_length',
+    # for somatotype predictors
+    'biacromial_brth',
+    'scye_circ_over_acromion',
+    'ankle_circ',
+    'calf_circ',
+    
 ]
 
 CATEGORICAL = ["gender"]

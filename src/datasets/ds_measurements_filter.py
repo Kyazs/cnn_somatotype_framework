@@ -3,154 +3,283 @@ import numpy as np
 
 
 import sys
+
 sys.path.append("..")
 from utils import *
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import Ridge
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import r2_score, mean_absolute_error
 
 
 DS_DIR = "../../data/datasets/"
 DS_ANSUR_DIR = os.path.join(DS_DIR, "ds_ansur_original")
+DS_SPRING_DIR = os.path.join(DS_DIR, "ds_SPRING")
 
-ANSURI_MEAS = ['WEIGHT',
-              'STATURE',
-              'NECK_CIRC-BASE',
-              'CHEST_CIRC',
-              'WAIST_CIRC-OMPHALION',  #'WAIST_CIRC_NATURAL',
-              'BUTTOCK_CIRC',
-              'SHOULDER_CIRC',
-              'THIGH_CIRC-PROXIMAL',
-              'THIGH_CIRC-DISTAL',
-              'CALF_CIRC',
-              'ANKLE_CIRC',
-              'FOREARM_CIRC-FLEXED',
-              'WRIST_CIRC-STYLION',
-              'SHOULDER_LNTH',
-              'SLEEVE-OUTSEAM_LNTH',
-              'RADIALE-STYLION_LNTH',
-              'CROTCH_HT',
-              'WAIST_NAT_LNTH',
-              'THIGH_LINK',  ## needs to be added ((D37) THIGH_LINK = TROCHANTERION_HT - LATERAL_FEMORAL_EPICONDYLE_HT)
-              'CHEST_DEPTH',
-              'HEAD_CIRC']
+ANSURI_MEAS = [
+    "WEIGHT",
+    "STATURE",
+    "NECK_CIRC-BASE",
+    "CHEST_CIRC",
+    "WAIST_CIRC-OMPHALION",  #'WAIST_CIRC_NATURAL',
+    "BUTTOCK_CIRC",
+    "SHOULDER_CIRC",
+    "THIGH_CIRC-PROXIMAL",
+    "THIGH_CIRC-DISTAL",
+    "CALF_CIRC",
+    "ANKLE_CIRC",
+    "FOREARM_CIRC-FLEXED",
+    "WRIST_CIRC-STYLION",
+    "SHOULDER_LNTH",
+    "SLEEVE-OUTSEAM_LNTH",
+    "RADIALE-STYLION_LNTH",
+    "CROTCH_HT",
+    "WAIST_NAT_LNTH",
+    "THIGH_LINK",  ## needs to be added ((D37) THIGH_LINK = TROCHANTERION_HT - LATERAL_FEMORAL_EPICONDYLE_HT)
+    "CHEST_DEPTH",
+    "HEAD_CIRC",
+    # for somatotype predictors
+    "BIACROMIAL_BRTH",
+    "SCYE_CIRC_OVER_ACROMION",
+]
 
-ANSURII_MEAS = ['weightkg',
-              'stature',
-              'neckcircumferencebase', 
-              'chestcircumference', 
-              'waistcircumference',
-              'buttockcircumference', 
-              'shouldercircumference',
-              'thighcircumference',
-              'lowerthighcircumference',
-              'calfcircumference', 
-              'anklecircumference',
-              'forearmcircumferenceflexed', 
-              'wristcircumference', 
-              'shoulderlength',
-              'sleeveoutseam',
-              'radialestylionlength',
-              'crotchheight',
-              'waistbacklength', 
-              'thighlink', 
-              'chestdepth',
-              'headcircumference']
+ANSURII_MEAS = [
+    "weightkg",
+    "stature",
+    "neckcircumferencebase",
+    "chestcircumference",
+    "waistcircumference",
+    "buttockcircumference",
+    "shouldercircumference",
+    "thighcircumference",
+    "lowerthighcircumference",
+    "calfcircumference",
+    "anklecircumference",
+    "forearmcircumferenceflexed",
+    "wristcircumference",
+    "shoulderlength",
+    "sleeveoutseam",
+    "radialestylionlength",
+    "crotchheight",
+    "waistbacklength",
+    "thighlink",
+    "chestdepth",
+    "headcircumference",
+    # for somatotype predictors
+    "biacromialbreadth",
+    "scyecircoveracromion",  # estimated_scye_circ = chestcircumference * (interscyei / chestbreadth)
+]
 
-DS_MEAS = {
-    DATASETS[0]: ANSURI_MEAS,
-    DATASETS[1]: ANSURII_MEAS
+DS_MEAS = {DATASETS[0]: ANSURI_MEAS, DATASETS[1]: ANSURII_MEAS}
+
+NEW_NAMES_DICT_ansurI = {
+    ANSURI_MEAS[i]: MEASUREMENTS[i] for i in range(len(ANSURI_MEAS))
+}
+NEW_NAMES_DICT_ansurII = {
+    ANSURII_MEAS[i]: MEASUREMENTS[i] for i in range(len(ANSURII_MEAS))
 }
 
-NEW_NAMES_DICT_ansurI = {ANSURI_MEAS[i]: MEASUREMENTS[i] for i in range(len(ANSURI_MEAS))}
-NEW_NAMES_DICT_ansurII = {ANSURII_MEAS[i]: MEASUREMENTS[i] for i in range(len(ANSURI_MEAS))}
+
+# ---------------------------------------------------------------------------
+# Imputation of missing measurements in SPRING using regressors trained on ANSUR combined
+# ---------------------------------------------------------------------------
+
+def _train_imputer(df_train, target, predictors):
+    df = df_train.dropna(subset=[target] + predictors)
+    if df.shape[0] < 10:
+        return None, None
+    X = df[predictors].to_numpy()
+    y = df[target].to_numpy()
+    Xtr, Xval, ytr, yval = train_test_split(X, y, test_size=0.2, random_state=42)
+    model = Ridge(alpha=1.0)
+    model.fit(Xtr, ytr)
+    ypred = model.predict(Xval)
+    return model, {"r2": r2_score(yval, ypred), "mae": mean_absolute_error(yval, ypred)}
+
+def impute_spring_from_ansur(df_spring, df_ansur_combined, targets=None, predictors=None):
+    """
+    Impute targets in df_spring using regressors trained on df_ansur_combined.
+    Adds boolean columns: <target>_imputed
+    Returns a new DataFrame (copy).
+    """
+    df_s = df_spring.copy()
+    if targets is None:
+        targets = ["biacromialbreadth", "scyecircoveracromion"]
+    if predictors is None:
+        # choose predictors that are present in both and not the targets
+        predictors = [c for c in MEASUREMENTS if c not in targets]
+    # keep numeric predictors only
+    predictors = [p for p in predictors if p in df_s.columns and p in df_ansur_combined.columns]
+    stats = {}
+    for tgt in targets:
+        if tgt not in df_s.columns:
+            df_s[tgt] = np.nan
+        # train on ANSUR combined
+        model, perf = _train_imputer(df_ansur_combined, tgt, predictors)
+        stats[tgt] = perf
+        if model is None:
+            continue
+        miss_mask = df_s[tgt].isna()
+        if miss_mask.any():
+            Xmiss = df_s.loc[miss_mask, predictors].to_numpy()
+            try:
+                preds = model.predict(Xmiss)
+            except Exception:
+                preds = np.full(Xmiss.shape[0], np.nan)
+            df_s.loc[miss_mask, tgt] = preds
+        #     df_s[f"{tgt}_imputed"] = False
+        #     df_s.loc[miss_mask, f"{tgt}_imputed"] = True
+        # else:
+        #     df_s[f"{tgt}_imputed"] = False
+    print("Imputation performance (on ANSUR holdout):", stats)
+    return df_s
 
 
 def generateANSURfiles():
 
     for ds in DATASETS:
         for gender in GENDERS:
-            dataset = load_ds(ds, gender)
+            try:
+                dataset = load_ds(ds, gender)
+                
+                # Substitutions, renames and drops
+                df = filter_ds(dataset, ds)
 
-            # Substitutions, renames and drops
-            df = filter_ds(dataset, ds)
+                # Save to csv
+                file_path = os.path.join(DS_DIR, f"measurements_{ds}_{gender}.csv")
+                df.to_csv(file_path, index=False)
+                print(f"Generated: {file_path}")
+                
+            except FileNotFoundError as e:
+                print(f"Error: Could not find file for {ds}_{gender}: {e}")
+            except Exception as e:
+                print(f"Error processing {ds}_{gender}: {e}")
+                raise
 
-            # Save to csv
-            file_path = os.path.join(DS_DIR, f"measurements_{ds}_{gender}.csv")
-            df.to_csv(file_path, index=False)
-            
-            
+
 def load_ds(ds, gender):
 
     ds_dir = os.path.join(DS_ANSUR_DIR, f"{ds}_{gender}.csv")
-    df = pd.read_csv(ds_dir, encoding = FILE_ENCODING, converters={'ID': str})
+    df = pd.read_csv(ds_dir, encoding=FILE_ENCODING, converters={"ID": str})
 
     return df
-    
+
 
 def filter_ds(df, ds):
 
     # Thigh length
-    if ds == 'ANSURI':
+    if ds == "ANSURI":
         # (D37) THIGH_LINK = TROCHANTERION_HT - LATERAL_FEMORAL_EPICONDYLE_HT
-        df['THIGH_LINK'] = df.apply(lambda row: row.TROCHANTERION_HT - row.LATERAL_FEMORAL_EPICONDYLE_HT, axis=1)
+        df["THIGH_LINK"] = df.apply(
+            lambda row: row.TROCHANTERION_HT - row.LATERAL_FEMORAL_EPICONDYLE_HT, axis=1
+        )
         # Rename columns and only consider MEASUREMENTS
-        df = df.rename(columns = NEW_NAMES_DICT_ansurI, inplace = False)
+        df = df.rename(columns=NEW_NAMES_DICT_ansurI, inplace=False)
+    elif ds == "ANSURII":
+        # estimated_scye_circ = chestcircumference * (interscyei / chestbreadth)
+        df["scyecircoveracromion"] = df.apply(
+            lambda row: row.chestcircumference * (row.interscyei / row.chestbreadth),
+            axis=1,
+        )
+        # compute thigh_length for ANSURII as well
+        df["thigh_length"] = df.apply(
+            lambda row: row.trochanterionheight - row.lateralfemoralepicondyleheight,
+            axis=1,
+        )
+        # rename columns and only consider MEASUREMENTS
+        df = df.rename(columns=NEW_NAMES_DICT_ansurII, inplace=False)
     else:
         # d29 = 'trochanterionheight' - 'lateralfemoralepicondyleheight'
-        df['thigh_length'] = df.apply(lambda row: row.trochanterionheight - row.lateralfemoralepicondyleheight, axis=1)
+        df["thigh_length"] = df.apply(
+            lambda row: row.trochanterionheight - row.lateralfemoralepicondyleheight,
+            axis=1,
+        )
         # Rename columns and only consider MEASUREMENTS
-        df = df.rename(columns = NEW_NAMES_DICT_ansurII, inplace = False)
+        df = df.rename(columns=NEW_NAMES_DICT_ansurII, inplace=False)
 
     # Drop columns that are not MEASUREMENTS
     # Divide by 10 to convert to cm
-    df = df[MEASUREMENTS] / 10.0
+    # Only use available columns
+    available_measurements = [col for col in MEASUREMENTS if col in df.columns]
+    df = df[available_measurements] / 10.0
 
     return df
 
 
 def generateTOTALfiles():
 
-    total_data = []  # List to store DataFrames for each gender
     for gender in GENDERS:
-        
-        #SPRING
-        ds_dir = os.path.join(DS_DIR, f"measurements_SPRING_{gender}.csv")
-        df_spring = pd.read_csv(ds_dir, encoding = FILE_ENCODING, converters={'ID': str})
-        df_spring = df_spring[MEASUREMENTS]
-        total_data.append(df_spring)
-        # Save as npy file
-        file_path_npy = os.path.join(DS_DIR, f"measurements_SPRING_{gender}.npy")
-        np.save(file_path_npy, df_spring.to_numpy())
+        try:
+            total_data = []  # List to store DataFrames for this gender
 
-        #ANSURI
-        ds_dir = os.path.join(DS_DIR, f"measurements_ANSURI_{gender}.csv")
-        df_ansurI = pd.read_csv(ds_dir, encoding = FILE_ENCODING, converters={'ID': str})
-        total_data.append(df_ansurI)
-        # Save as npy file
-        file_path_npy = os.path.join(DS_DIR, f"measurements_ANSURI_{gender}.npy")
-        np.save(file_path_npy, df_ansurI .to_numpy())
+            # Read processed ANSURI and ANSURII files (generated by generateANSURfiles)
+            file_path_ansurI = os.path.join(DS_DIR, f"measurements_ANSURI_{gender}.csv")
+            if not os.path.exists(file_path_ansurI):
+                raise FileNotFoundError(f"ANSURI file not found: {file_path_ansurI}. Run generateANSURfiles() first.")
+            df_ansurI = pd.read_csv(file_path_ansurI, encoding=FILE_ENCODING, converters={"ID": str})
+            
+            file_path_ansurII = os.path.join(DS_DIR, f"measurements_ANSURII_{gender}.csv")
+            if not os.path.exists(file_path_ansurII):
+                raise FileNotFoundError(f"ANSURII file not found: {file_path_ansurII}. Run generateANSURfiles() first.")
+            df_ansurII = pd.read_csv(file_path_ansurII, encoding=FILE_ENCODING, converters={"ID": str})
+            
+            df_ansur_combined = pd.concat([df_ansurI, df_ansurII], ignore_index=True)
 
-        #ANSURII
-        ds_dir = os.path.join(DS_DIR, f"measurements_ANSURII_{gender}.csv")
-        df_ansurII = pd.read_csv(ds_dir, encoding = FILE_ENCODING, converters={'ID': str})
-        total_data.append(df_ansurII)
-        # Save as npy file
-        file_path_npy = os.path.join(DS_DIR, f"measurements_ANSURII_{gender}.npy")
-        np.save(file_path_npy, df_ansurII.to_numpy())
+            # Process SPRING dataset (already processed, just read directly)
+            ds_dir = os.path.join(DS_SPRING_DIR, f"SPRING_{gender}.csv")
+            if not os.path.exists(ds_dir):
+                raise FileNotFoundError(f"SPRING file not found: {ds_dir}")
+            df_spring = pd.read_csv(ds_dir, encoding=FILE_ENCODING, converters={"bodyID": str})
+            
+            # Rename bodyID to ID to match other datasets
+            df_spring = df_spring.rename(columns={"bodyID": "ID"})
+            
+            # select only MEASUREMENTS columns that exist in SPRING (excluding somatotype predictors)
+            spring_columns = [c for c in MEASUREMENTS if c in df_spring.columns]
+            df_spring = df_spring[spring_columns]
 
-        # Concatenate all DataFrames into a single DataFrame
-        total_dataframe = pd.concat(total_data, ignore_index=True)
+            # Impute missing somatotype predictors in SPRING using ANSUR
+            df_spring = impute_spring_from_ansur(df_spring, df_ansur_combined)
 
-        # Save the concatenated DataFrame to a new CSV file
-        file_path = os.path.join(DS_DIR, f"measurements_TOTAL_{gender}.csv")
-        total_dataframe.to_csv(file_path, index=False, encoding=FILE_ENCODING)
+            # Save processed SPRING file as CSV and npy
+            file_path_csv = os.path.join(DS_DIR, f"measurements_SPRING_{gender}.csv")
+            df_spring.to_csv(file_path_csv, index=False, encoding=FILE_ENCODING)
+            file_path_npy = os.path.join(DS_DIR, f"measurements_SPRING_{gender}.npy")
+            np.save(file_path_npy, df_spring.to_numpy())
 
-        # Save the concatenated DataFrame as npy file
-        file_path_npy = os.path.join(DS_DIR, f"measurements_TOTAL_{gender}.npy")
-        np.save(file_path_npy, total_dataframe.to_numpy())
+            # Save ANSURI and ANSURII as npy files (CSV already exists from generateANSURfiles)
+            file_path_npy = os.path.join(DS_DIR, f"measurements_ANSURI_{gender}.npy")
+            np.save(file_path_npy, df_ansurI.to_numpy())
+            file_path_npy = os.path.join(DS_DIR, f"measurements_ANSURII_{gender}.npy")
+            np.save(file_path_npy, df_ansurII.to_numpy())
 
-# ===========================================================================    
+            # Add all datasets to total_data for concatenation
+            total_data.extend([df_spring, df_ansurI, df_ansurII])
+
+            # Concatenate all DataFrames into a single DataFrame for this gender
+            total_dataframe = pd.concat(total_data, ignore_index=True)
+
+            # Save the concatenated DataFrame to a new CSV file
+            file_path = os.path.join(DS_DIR, f"measurements_TOTAL_{gender}.csv")
+            total_dataframe.to_csv(file_path, index=False, encoding=FILE_ENCODING)
+
+            # Save the concatenated DataFrame as npy file
+            file_path_npy = os.path.join(DS_DIR, f"measurements_TOTAL_{gender}.npy")
+            np.save(file_path_npy, total_dataframe.to_numpy())
+            
+            print(f"Generated TOTAL files for {gender}: CSV and NPY")
+            
+        except FileNotFoundError as e:
+            print(f"Error: {e}")
+            raise
+        except Exception as e:
+            print(f"Error processing TOTAL files for {gender}: {e}")
+            raise
+
+# ===========================================================================
 
 if __name__ == "__main__":
-  
-#   generateANSURfiles()
 
-  generateTOTALfiles()
+    generateANSURfiles()
+
+    generateTOTALfiles()
