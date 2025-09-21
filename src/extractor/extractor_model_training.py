@@ -245,18 +245,14 @@ def main():
 
 def align_data_by_ids(df_total, imgX_front, imgX_side):
     """
-    Align image data with measurement data based on IDs instead of truncating randomly.
+    Align image data with measurement data by truncating to minimum sample count.
     This ensures we keep the correct samples that have both measurements and images.
     """
-    print("Aligning data by IDs...")
+    print("Aligning data by sample count...")
     
-    # Get the IDs from the dataframe
-    measurement_ids = df_total['ID'].values
-    print(f"Measurement IDs available: {len(measurement_ids)}")
-    
-    # For this to work, we need to know which images correspond to which IDs
-    # This requires the image loading process to preserve ID information
-    # Since that's not currently available, we'll use a safer truncation approach
+    print(f"Measurement data samples: {len(df_total)}")
+    print(f"Front image samples: {len(imgX_front)}")
+    print(f"Side image samples: {len(imgX_side)}")
     
     # Find minimum sample count
     min_samples = min(len(df_total), len(imgX_front), len(imgX_side))
