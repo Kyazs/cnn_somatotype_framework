@@ -156,17 +156,27 @@ def main():
     print(f"testMeasX.shape = {testMeasX.shape}\n")
 
     #############################################
-    ### Create tf.data Datasets for Memory Efficiency
+    ### Prepare Data for Training (Original Approach + Optimizations)
     #############################################
     
     batch_size = 32  # NN_PARAMETERS["batch_size"]
     
-    # Create memory-efficient tf.data datasets
-    train_dataset, val_dataset = create_tf_datasets(
-        trainMeasX, trainImgXf, trainImgXs, trainMeasY,
-        testMeasX, testImgXf, testImgXs, testMeasY,
-        batch_size=batch_size
-    )
+    # Convert to float32 for mixed precision compatibility
+    trainMeasX = trainMeasX.astype('float32')
+    trainImgXf = trainImgXf.astype('float32')
+    trainImgXs = trainImgXs.astype('float32')
+    trainMeasY = trainMeasY.astype('float32')
+    
+    testMeasX = testMeasX.astype('float32')
+    testImgXf = testImgXf.astype('float32') 
+    testImgXs = testImgXs.astype('float32')
+    testMeasY = testMeasY.astype('float32')
+    
+    print("Data converted to float32 for mixed precision compatibility")
+    print(f"trainMeasX.shape = {trainMeasX.shape}")
+    print(f"trainImgXf.shape = {trainImgXf.shape}")
+    print(f"trainImgXs.shape = {trainImgXs.shape}")
+    print(f"trainMeasY.shape = {trainMeasY.shape}")
 
     #############################################
     ### MLP + CNN Model
@@ -248,7 +258,7 @@ def main():
     print(f"Mixed Precision: {tf.keras.mixed_precision.global_policy().name}")
     print(f"Optimizer: {type(opt).__name__}")
     print(f"Batch Size: {batch_size}")
-    print(f"Dataset Type: tf.data.Dataset (memory optimized)")
+    print(f"Data Type: NumPy arrays (float32 optimized)")
     print(f"Callbacks: {len(callbacks_list)} monitoring callbacks enabled")
     print(f"{'='*60}\n")
 
@@ -263,8 +273,10 @@ def main():
     print("[INFO] Starting robust training with comprehensive monitoring...")
     try:
         Combined_history = Combined_model.fit(
-            train_dataset,
-            validation_data=val_dataset,
+            x=[trainMeasX, trainImgXf, trainImgXs],
+            y=trainMeasY,
+            validation_data=([testMeasX, testImgXf, testImgXs], testMeasY),
+            batch_size=batch_size,
             verbose=2,
             epochs=EPOCHS,
             callbacks=callbacks_list,
@@ -536,76 +548,6 @@ def load_images():
         print("imgX_side_male was already deleted")
 
     return imgX_front, imgX_side
-
-
-def create_tf_datasets(trainMeasX, trainImgXf, trainImgXs, trainMeasY, 
-                      testMeasX, testImgXf, testImgXs, testMeasY, batch_size=32):
-    """
-    Create tf.data.Dataset objects for better memory management and performance.
-    
-    Args:
-        trainMeasX, trainImgXf, trainImgXs, trainMeasY: Training data
-        testMeasX, testImgXf, testImgXs, testMeasY: Testing data
-        batch_size: Batch size for training
-        
-    Returns:
-        Tuple of (train_dataset, val_dataset)
-    """
-    print("Creating tf.data datasets for memory-efficient training...")
-    
-    # Convert to float32 for consistency and mixed precision compatibility
-    trainMeasX = tf.cast(trainMeasX, tf.float32)
-    trainImgXf = tf.cast(trainImgXf, tf.float32) 
-    trainImgXs = tf.cast(trainImgXs, tf.float32)
-    trainMeasY = tf.cast(trainMeasY, tf.float32)
-    
-    testMeasX = tf.cast(testMeasX, tf.float32)
-    testImgXf = tf.cast(testImgXf, tf.float32)
-    testImgXs = tf.cast(testImgXs, tf.float32) 
-    testMeasY = tf.cast(testMeasY, tf.float32)
-    
-    print(f"Data shapes after conversion:")
-    print(f"  trainMeasX: {trainMeasX.shape}")
-    print(f"  trainImgXf: {trainImgXf.shape}")
-    print(f"  trainImgXs: {trainImgXs.shape}")
-    print(f"  trainMeasY: {trainMeasY.shape}")
-    
-    # Create separate datasets for each input to avoid shape conflicts
-    train_num_dataset = tf.data.Dataset.from_tensor_slices(trainMeasX)
-    train_front_dataset = tf.data.Dataset.from_tensor_slices(trainImgXf)
-    train_side_dataset = tf.data.Dataset.from_tensor_slices(trainImgXs)
-    train_target_dataset = tf.data.Dataset.from_tensor_slices(trainMeasY)
-    
-    val_num_dataset = tf.data.Dataset.from_tensor_slices(testMeasX)
-    val_front_dataset = tf.data.Dataset.from_tensor_slices(testImgXf)
-    val_side_dataset = tf.data.Dataset.from_tensor_slices(testImgXs)
-    val_target_dataset = tf.data.Dataset.from_tensor_slices(testMeasY)
-    
-    # Zip datasets together (this maintains separate tensors)
-    train_dataset = tf.data.Dataset.zip((train_num_dataset, train_front_dataset, train_side_dataset, train_target_dataset))
-    val_dataset = tf.data.Dataset.zip((val_num_dataset, val_front_dataset, val_side_dataset, val_target_dataset))
-    
-    # Configure training dataset with optimizations
-    def format_inputs(numerical, front_img, side_img, targets):
-        """Format inputs for the model: returns ([num, front, side], targets)"""
-        return [numerical, front_img, side_img], targets
-    
-    train_dataset = (train_dataset
-                    .shuffle(buffer_size=1000)
-                    .batch(batch_size)
-                    .map(format_inputs, num_parallel_calls=tf.data.AUTOTUNE)
-                    .prefetch(tf.data.AUTOTUNE))
-    
-    # Configure validation dataset
-    val_dataset = (val_dataset
-                  .batch(batch_size)
-                  .map(format_inputs, num_parallel_calls=tf.data.AUTOTUNE)
-                  .prefetch(tf.data.AUTOTUNE))
-    
-    print(f"Train dataset created successfully")
-    print(f"Validation dataset created successfully")
-    
-    return train_dataset, val_dataset
 
 
 class MemoryMonitorCallback(tf.keras.callbacks.Callback):
