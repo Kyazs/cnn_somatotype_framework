@@ -223,38 +223,8 @@ def generateTOTALfiles():
                 raise FileNotFoundError(f"ANSURII file not found: {file_path_ansurII}. Run generateANSURfiles() first.")
             df_ansurII = pd.read_csv(file_path_ansurII, encoding=FILE_ENCODING, converters={"ID": str})
             
-            df_ansur_combined = pd.concat([df_ansurI, df_ansurII], ignore_index=True)
-
-            # Process SPRING dataset (already processed, just read directly)
-            ds_dir = os.path.join(DS_SPRING_DIR, f"SPRING_{gender}.csv")
-            if not os.path.exists(ds_dir):
-                raise FileNotFoundError(f"SPRING file not found: {ds_dir}")
-            df_spring = pd.read_csv(ds_dir, encoding=FILE_ENCODING, converters={"bodyID": str})
-            
-            # Rename bodyID to ID to match other datasets
-            df_spring = df_spring.rename(columns={"bodyID": "ID"})
-            
-            # select only MEASUREMENTS columns that exist in SPRING (excluding somatotype predictors)
-            spring_columns = [c for c in MEASUREMENTS if c in df_spring.columns]
-            df_spring = df_spring[spring_columns]
-
-            # Impute missing somatotype predictors in SPRING using ANSUR
-            df_spring = impute_spring_from_ansur(df_spring, df_ansur_combined)
-
-            # Save processed SPRING file as CSV and npy
-            file_path_csv = os.path.join(DS_DIR, f"measurements_SPRING_{gender}.csv")
-            df_spring.to_csv(file_path_csv, index=False, encoding=FILE_ENCODING)
-            file_path_npy = os.path.join(DS_DIR, f"measurements_SPRING_{gender}.npy")
-            np.save(file_path_npy, df_spring.to_numpy())
-
-            # Save ANSURI and ANSURII as npy files (CSV already exists from generateANSURfiles)
-            file_path_npy = os.path.join(DS_DIR, f"measurements_ANSURI_{gender}.npy")
-            np.save(file_path_npy, df_ansurI.to_numpy())
-            file_path_npy = os.path.join(DS_DIR, f"measurements_ANSURII_{gender}.npy")
-            np.save(file_path_npy, df_ansurII.to_numpy())
-
-            # Add all datasets to total_data for concatenation
-            total_data.extend([df_spring, df_ansurI, df_ansurII])
+            # MODIFIED: Only include ANSURI and ANSURII in total_data (exclude SPRING)
+            total_data.extend([df_ansurI, df_ansurII])
 
             # Concatenate all DataFrames into a single DataFrame for this gender
             total_dataframe = pd.concat(total_data, ignore_index=True)
@@ -267,7 +237,7 @@ def generateTOTALfiles():
             file_path_npy = os.path.join(DS_DIR, f"measurements_TOTAL_{gender}.npy")
             np.save(file_path_npy, total_dataframe.to_numpy())
             
-            print(f"Generated TOTAL files for {gender}: CSV and NPY")
+            print(f"Generated TOTAL files for {gender}: CSV and NPY (ANSURI + ANSURII only)")
             
         except FileNotFoundError as e:
             print(f"Error: {e}")
