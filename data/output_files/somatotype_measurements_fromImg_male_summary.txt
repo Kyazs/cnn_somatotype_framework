@@ -1,29 +1,29 @@
 === SOMATOTYPE MEASUREMENT RESULTS ===
 
 Gender: male
-Processing Date: 2025-09-09 20:06:02.346647
+Processing Date: 2025-09-13 19:36:16.191898
 
 BASE MEASUREMENTS:
   Weight: 42.5 kg
   Stature: 159.5 cm
-  Chest Girth: 108.9 cm
-  Waist Girth: 92.9 cm
-  Hip Girth: 98.8 cm
+  Chest Girth: 109.7 cm
+  Waist Girth: 93.6 cm
+  Hip Girth: 99.3 cm
 
 SOMATOTYPE MEASUREMENTS:
 
 Skinfold Measurements:
   Triceps Skinfold Mm: 11.9 mm (confidence: 0.72)
-  Subscapular Skinfold Mm: 25.5 mm (confidence: 0.95)
-  Suprailiac Skinfold Mm: 19.4 mm (confidence: 0.30)
-  Calf Skinfold Mm: 13.4 mm (confidence: 0.30)
+  Subscapular Skinfold Mm: 25.8 mm (confidence: 0.95)
+  Suprailiac Skinfold Mm: 19.0 mm (confidence: 0.30)
+  Calf Skinfold Mm: 13.5 mm (confidence: 0.30)
 
 Bone Breadth Measurements:
   Humerus Biepicondylar Breadth Cm: 7.2 cm (confidence: 0.30)
   Femur Biepicondylar Breadth Cm: 10.1 cm (confidence: 0.30)
 
 Specialized Circumferences:
-  Arm Circumference Flexed Cm: 29.7 cm (confidence: 0.30)
+  Arm Circumference Flexed Cm: 28.6 cm (confidence: 0.30)
   Calf Circumference Cm: 39.4 cm (confidence: 0.30)
 
 ==================================================

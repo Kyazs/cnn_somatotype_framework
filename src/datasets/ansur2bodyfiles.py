@@ -28,7 +28,18 @@ def main():
         for gender in GENDERS:
             
             file_path = os.path.join(DS_DIR, f"measurements_{ds}_{gender}.csv") #.replace("\\","/")
-            ansur_df = pd.read_csv(file_path, encoding = FILE_ENCODING)
+            
+            # Check if the file has bodyID column
+            with open(file_path, 'r') as f:
+                header = f.readline().strip()
+            
+            if header.startswith('bodyID'):
+                # File has bodyID column, use it as index
+                ansur_df = pd.read_csv(file_path, encoding = FILE_ENCODING, index_col=0)
+            else:
+                # File has no bodyID column, create sequential index
+                ansur_df = pd.read_csv(file_path, encoding = FILE_ENCODING)
+                ansur_df.index = [f"{ds}_{gender[:3]}_{str(i+1).zfill(4)}" for i in range(len(ansur_df))]
         
             print(ansur_df.shape)
         
@@ -38,9 +49,9 @@ def main():
             except OSError as error: 
                 print(error)  
         
-            for index, row in ansur_df.iterrows():
+            for idx, (index, row) in enumerate(ansur_df.iterrows()):
 
-                ava_name = f"{ds}_{gender[:3]}_{str(index+1).zfill(4)}"
+                ava_name = f"{ds}_{gender[:3]}_{str(idx+1).zfill(4)}"
                 ava_path = os.path.join(gender_dir, f"{ava_name}.obj")
 
                 if os.path.exists(ava_path) and check_obj_complete(ava_path):

@@ -5,6 +5,9 @@ data/**/*.npz
 data/**/*.keras
 # data/**/*.h5
 # data/**/*.obj
+venv/
+data/obj_files/
+data/datasets/silhouettes_blender*/
 
 # Except the data directory itself
 !data

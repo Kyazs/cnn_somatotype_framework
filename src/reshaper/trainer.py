@@ -101,14 +101,19 @@ def obj2npy(label = "female"):
 
     print('[3] starting to load vertices from .obj files for %s'%(label))
     start = time.time()    
-    obj_file_dir = os.path.join(OBJ_FILES_SPRING, label)
-    file_list = sorted(os.listdir(obj_file_dir))
+    obj_file_dirs = [os.path.join(OBJ_FILES_ANSURI, label), os.path.join(OBJ_FILES_ANSURII, label)]
+    file_list = []
+    for obj_file_dir in obj_file_dirs:
+        if os.path.exists(obj_file_dir):
+            file_list.extend(sorted(os.listdir(obj_file_dir)))
  
     # load original data
     vertices = []
     for i, obj in enumerate(file_list):
         sys.stdout.write('\r>>  converting %s body %d'%(label, i + 1))
         sys.stdout.flush()
+        # Determine which directory the file is in
+        obj_file_dir = obj_file_dirs[0] if os.path.exists(os.path.join(obj_file_dirs[0], obj)) else obj_file_dirs[1]
         f = open(os.path.join(obj_file_dir, obj), 'r')
         for line in f:
             if line[0] == '#':
@@ -191,8 +196,11 @@ def calculate_weights(cp, vertices, facets, label):
     
     np.save(open(os.path.join(RESHAPER_FILES_DIR, f"volumes_{label}.npy"), "wb"), volumes)    
 
-    obj_file_dir = os.path.join(OBJ_FILES_SPRING, label)
-    file_list = sorted(os.listdir(obj_file_dir))
+    obj_file_dirs = [os.path.join(OBJ_FILES_ANSURI, label), os.path.join(OBJ_FILES_ANSURII, label)]
+    file_list = []
+    for obj_file_dir in obj_file_dirs:
+        if os.path.exists(obj_file_dir):
+            file_list.extend(sorted(os.listdir(obj_file_dir)))
     
     weights_src = ['Volume', '3DHBSh', 'Aqua-Calc', 'Article 1987']
     with open(os.path.join(RESHAPER_FILES_DIR, f"weights_{label}.csv"), 'w') as outfile:
@@ -241,6 +249,7 @@ def measure_bodies(cp, vertices, vol, label = "female"):
     mean_measurements = np.array(measurements.mean(axis=1), dtype=np.float64).reshape(M_NUM, 1)
     std_measurements = np.array(measurements.std(axis=1), dtype=np.float64).reshape(M_NUM, 1)
     t_measurements = (measurements - mean_measurements) / std_measurements
+    t_measurements = np.nan_to_num(t_measurements, nan=0.0)
     
     np.save(open(os.path.join(RESHAPER_FILES_DIR, f'mean_measurements_{label}.npy'), "wb"), mean_measurements)
     np.save(open(os.path.join(RESHAPER_FILES_DIR, f"std_measurements_{label}.npy"), "wb"), std_measurements)
@@ -268,15 +277,38 @@ def calc_measurements(cp, vertices, vol):
     # Calculate the the person's weight
     weight = KHUMANBODY_DENSITY * vol
         
-    measurement_list.append(weight)   #* 10
+    measurement_list.append(float(weight))   #* 10
     # calculate other measures
-    for j, meas in enumerate(MEASUREMENTS[1:]):   #  skip 0 - weight
+    for j in range(len(cp)):
+        meas = MEASUREMENTS[1 + j]
         length = 0.0
         length = calc_length(MEAS_LABELS[meas], cp[j], vertices, meas)
-        measurement_list.append(length * 100) # meters to cm   
+        # ensure length is a scalar
+        if hasattr(length, '__len__') and not isinstance(length, (str, bytes)):
+            length = length[0] if len(length) > 0 else 0.0
+        measurement_list.append(float(length) * 100.0) # meters to cm   
 
-    # Convert to numpy array
-    return np.array(measurement_list, dtype=np.float64).reshape(M_NUM, 1)
+    # pad with 0s for measurements without control points
+    while len(measurement_list) < M_NUM:
+        measurement_list.append(0.0)
+
+    # Convert to numpy array - ensure all elements are scalars
+    clean_list = []
+    for x in measurement_list:
+        if hasattr(x, '__len__') and not isinstance(x, (str, bytes)):
+            clean_list.append(float(x[0]) if len(x) > 0 else 0.0)
+        else:
+            clean_list.append(float(x))
+    
+    try:
+        return np.array(clean_list, dtype=np.float64).reshape(M_NUM, 1)
+    except Exception as e:
+        print(f"Error creating array from measurement_list: {e}")
+        print(f"measurement_list length: {len(clean_list)}")
+        print(f"M_NUM: {M_NUM}")
+        for i, val in enumerate(clean_list):
+            print(f"  [{i}]: {val} (type: {type(val)})")
+        raise
 
 
 def calc_length(lab, cplist, vertices, meas):
@@ -339,10 +371,13 @@ def save_data_csv(meas_names, measurements, label = 'female'):
         None
     """
     
-    obj_file_dir = os.path.join(OBJ_FILES_SPRING, label)
-    file_list = sorted(os.listdir(obj_file_dir))
+    obj_file_dirs = [os.path.join(OBJ_FILES_ANSURI, label), os.path.join(OBJ_FILES_ANSURII, label)]
+    file_list = []
+    for obj_file_dir in obj_file_dirs:
+        if os.path.exists(obj_file_dir):
+            file_list.extend(sorted(os.listdir(obj_file_dir)))
     
-    with open(os.path.join(DS_DIR, f'measurements_SPRING_{label}.csv'), 'w') as outfile:
+    with open(os.path.join(DS_DIR, f'measurements_ANSUR_{label}.csv'), 'w') as outfile:
         # I'm writing a header here just for the sake of readability
         outfile.write('bodyID,' + ",".join(MEASUREMENTS) + '\n')
         
@@ -489,6 +524,7 @@ def rfe_local(Qdets, Qdeform, measurements, label = "female", k_features = 9):
     std_measurements = np.array(measurements.std(axis=1)).reshape(M_NUM, 1)
     # calculate t-value from mean and standard deviation
     t_measurements = (measurements - mean_measurements) / std_measurements
+    t_measurements = np.nan_to_num(t_measurements, nan=0.0)
     X = t_measurements.transpose()
         
     # (recursive feature elimination (RFE))

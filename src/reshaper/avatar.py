@@ -363,7 +363,7 @@ class Avatar:
                         "Measurement",
                         "Basic-Input",
                         "Predicted-Input",
-                        f"3D Avatar-Output ({chr(0x03B4)}%)",
+                        # f"3D Avatar-Output ({chr(0x03B4)}%)",
                     )  # \u03B4
                 )
                 file.write(

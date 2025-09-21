@@ -3,7 +3,22 @@ Official Code for "Curbelo, J.P., Spiteri, R.J. A methodology for realistic huma
 
 ![creating by deform-based global mapping](https://raw.githubusercontent.com/jpcurbelo/human-body-reshape-DL-paper/master/figures/Fig1.png)
 
-If you want to explore this repo and eventually contribute, please, follow the instructions below.
+## ✨ New Features
+- 🧬 **Somatotype Analysis**: Advanced body composition assessment with 8 specialized measurements
+- 📖 **Literature-Based Predictions**: Scientifically validated equations from peer-reviewed research
+- 📚 **Comprehensive Documentation**: Organized technical and user documentation
+- 🔄 **Enhanced Workflows**: Specialized pipelines for standard and somatotype analysis
+
+## 📚 Documentation
+
+For complete documentation, please visit: **[📁 Documentation](./documentation/README.md)**
+
+### Quick Links:
+- 👥 **[User Guide](./documentation/user-guides/info101.md)** - Getting started
+- 🔧 **[Technical Overview](./documentation/technical/review.md)** - System architecture  
+- 🧬 **[Somatotype Analysis](./documentation/somatotype/SOMATOTYPE_INTEGRATION.md)** - Advanced body composition
+
+If you want to explore this repo and eventually contribute, please follow the instructions below.
 
 ## Getting Started
 
@@ -33,6 +48,26 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+## 🚀 Quick Usage
+
+### Standard 3D Avatar Generation
+```bash
+# Place your input images (input_front.png, input_side.png) and info (input_info.csv) 
+# in data/input_files/ then run:
+python src/photos2avatar.py
+```
+
+### Advanced Somatotype Analysis  
+```bash
+# Generate 3D avatar + specialized body composition measurements:
+python src/photos2somatotype.py
+```
+
+### Output Files
+- **3D Avatars**: `.obj` files (Blender, Maya compatible)
+- **Measurements**: `.csv` files with detailed anthropometric data
+- **Reports**: Human-readable summaries with confidence analysis
+
 ## Folder Structure
 
 Here's an overview of the folder structure after cloning the repository:
@@ -51,8 +86,14 @@ human-body-reshape-DL-paper/
 │   │   └── [Input files for the Extractor and to create the 3D avatar: measurements and full-body images]
 │   ├── model_files/
 │   │   ├── extractor_nn_model.h5
+│   │   └── [Trained neural network models]
 │   ├── output_files/
 │   │   └── [Silhouettes/Avatar outputs files]
+├── documentation/
+│   ├── technical/          # Technical documentation
+│   ├── user-guides/        # User-friendly guides
+│   ├── somatotype/         # Somatotype system docs
+│   └── README.md          # Documentation index
 ├── figures/
 ├── src/
 │   ├── datasets/
@@ -60,11 +101,16 @@ human-body-reshape-DL-paper/
 │   │   └── ds_processer.py
 │   ├── reshaper/
 │   │   ├── avatar.py
+│   │   ├── avatar_somatotype.py    # Enhanced somatotype avatar
 │   │   ├── cp_handler.py
 │   │   ├── tests_temp.py
 │   │   ├── trainer.py
 │   ├── extractor/
 │   │   ├── extractor_model_training.py
+│   ├── photos2avatar.py           # Standard workflow
+│   ├── photos2somatotype.py       # Somatotype workflow  
+│   ├── somatotype_config.py       # Somatotype configuration
+│   ├── train_somatotype_models.py # Model training pipeline
 │   └── utils.py
 ```
 

@@ -146,7 +146,7 @@ CONTINUOUS = [x for x in KN_MEAS if x not in CATEGORICAL]
 SCALER = StandardScaler()     #MinMaxScaler()   #StandardScaler()
 
 ## To save/load only a fraction of the img files for testing (loading RAM in training)
-TEST_FILES = True
+TEST_FILES = False
 TEST_FILES_NUM = 100
 
 ##################################

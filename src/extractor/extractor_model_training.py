@@ -6,11 +6,19 @@ import joblib
 import matplotlib.pyplot as plt
 
 import tensorflow as tf
-if tf.test.gpu_device_name():
-    print(f"\nDefault GPU Device: {tf.test.gpu_device_n2ame()}\n")
-    ## Usual output: 'Default GPU Device: /device:GPU:0'
+
+# Replace buggy check with robust detection + memory growth
+gpus = tf.config.list_physical_devices("GPU")
+if gpus:
+    print(f"\nGPU Device(s) found: {gpus}\n")
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        print("GPU memory growth configured successfully\n")
+    except RuntimeError as e:
+        print(f"GPU configuration error: {e}\n")
 else:
-    print("\nPlease install GPU version of TF\n")
+    print("\nNo GPU detected - training will run on CPU\n")
 
 from sklearn.model_selection import train_test_split
 
@@ -31,22 +39,28 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 
 import sys
+
 sys.path.append("..")
 from utils import *
 
-SIL_FILES_DIR_npy = os.path.join(DS_DIR , f"silhouettes_blender{IMG_SIZE_4NN}_npy")
+SIL_FILES_DIR_npy = os.path.join(DS_DIR, f"silhouettes_blender{IMG_SIZE_4NN}_npy")
 
 ## Load scaler
 if TEST_FILES == True:
     if isinstance(SCALER, StandardScaler):
-        TOT_SCALER_DIR = os.path.join(MODEL_FILES_DIR, f"scalerStd_{TEST_FILES_NUM}_extractor_test.pkl")
+        TOT_SCALER_DIR = os.path.join(
+            MODEL_FILES_DIR, f"scalerStd_{TEST_FILES_NUM}_extractor_test.pkl"
+        )
     else:
-        TOT_SCALER_DIR = os.path.join(MODEL_FILES_DIR, f"scalerMinMax_{TEST_FILES_NUM}_extractor_test.pkl")
+        TOT_SCALER_DIR = os.path.join(
+            MODEL_FILES_DIR, f"scalerMinMax_{TEST_FILES_NUM}_extractor_test.pkl"
+        )
 else:
     if isinstance(SCALER, StandardScaler):
         TOT_SCALER_DIR = os.path.join(MODEL_FILES_DIR, "scalerStd_extractor.pkl")
     else:
         TOT_SCALER_DIR = os.path.join(MODEL_FILES_DIR, "scalerMinMax_extractor.pkl")
+
 
 def main():
 
@@ -55,7 +69,6 @@ def main():
         os.mkdir(MODEL_FILES_DIR)
     except OSError as error:
         print(error)
-
 
     #############################################
     ### Load Databases
@@ -67,6 +80,7 @@ def main():
     ### Load Images
     #############################################
     # exit()
+    print(f"loading images")
     imgX_front, imgX_side = load_images()
     print(f"imgX_front.shape = {imgX_front.shape}")
     print(f"imgX_side.shape = {imgX_side.shape}\n")
@@ -76,8 +90,15 @@ def main():
     #############################################
 
     ## Train and Test splitting
-    (trainData, testData, trainImgXf, testImgXf, trainImgXs, testImgXs) = train_test_split(
-        df_total, imgX_front, imgX_side, train_size=0.8, shuffle=True, random_state=123
+    (trainData, testData, trainImgXf, testImgXf, trainImgXs, testImgXs) = (
+        train_test_split(
+            df_total,
+            imgX_front,
+            imgX_side,
+            train_size=0.8,
+            shuffle=True,
+            random_state=123,
+        )
     )
 
     ## DELETE to free memory
@@ -94,7 +115,9 @@ def main():
     gc.collect()
 
     ## Normalize the UNKNOWN MEASUREMENTS (labels) - will lead to better training and convergence
-    trainMeasY = (trainData[UK_MEAS] - df_total[UK_MEAS].mean()) / df_total[UK_MEAS].std()
+    trainMeasY = (trainData[UK_MEAS] - df_total[UK_MEAS].mean()) / df_total[
+        UK_MEAS
+    ].std()
     testMeasY = (testData[UK_MEAS] - df_total[UK_MEAS].mean()) / df_total[UK_MEAS].std()
 
     ## Scales Train and Test values
@@ -160,16 +183,17 @@ def main():
     met = ["mean_absolute_error"]
     Combined_model.compile(loss=lo, optimizer=opt, metrics=met)
 
-    batch_size = 32    #NN_PARAMETERS["batch_size"] 
+    batch_size = 32  # NN_PARAMETERS["batch_size"]
 
     """### Train and save the model"""
 
-    training_data_gen = generator2imgsNumData(datagen, 
-        trainMeasX, trainImgXf, trainImgXs, trainMeasY, batch_size
-    )
-    validation_data_gen = generator2imgsNumData(
-        datagen, testMeasX, testImgXf, testImgXs, testMeasY, batch_size
-    )
+    # Note: Using direct data instead of generators for simplicity
+    # training_data_gen = generator2imgsNumData(
+    #     datagen, trainMeasX, trainImgXf, trainImgXs, trainMeasY, batch_size
+    # )
+    # validation_data_gen = generator2imgsNumData(
+    #     datagen, testMeasX, testImgXf, testImgXs, testMeasY, batch_size
+    # )
 
     ## Instantiate an early stopping callback
     early_stopping = EarlyStopping(
@@ -184,13 +208,13 @@ def main():
     ## Train the model
     print("[INFO] training model...")
     Combined_history = Combined_model.fit(
-        training_data_gen,
-        validation_data=(validation_data_gen),
-        validation_steps=testImgXf.shape[0] // batch_size,
-        steps_per_epoch=trainImgXf.shape[0] // batch_size,
+        [trainMeasX, trainImgXf, trainImgXs],
+        trainMeasY,
+        validation_data=([testMeasX, testImgXf, testImgXs], testMeasY),
+        batch_size=batch_size,
         verbose=2,
-        epochs=EPOCHS ,
-        callbacks=[early_stopping],  
+        epochs=EPOCHS,
+        callbacks=[early_stopping],
     )
 
     gc.collect()
@@ -226,26 +250,18 @@ def load_databases():
 
     file_encoding = "ISO-8859-1"  # 'utf8'
 
-    df_spring = list()
+    # df_spring = list()
     df_ansuri = list()
     df_ansurii = list()
 
     for dbi, dbname in enumerate(DBNAMES):
+        if dbi == 0:
+            continue  # Skip SPRING
         for i, gender in enumerate(GENDER_DICT.keys()):
-
-            db_dir = os.path.join(DS_DIR, f"measurements_{dbname}_{gender}.csv")    
-
+            db_dir = os.path.join(DS_DIR, f"measurements_{dbname}_{gender}.csv")
             df = pd.read_csv(db_dir, encoding=file_encoding, converters={"ID": str})
 
-            if dbi == 0:
-                df_spring.append(df)
-                df_spring[i].drop(
-                    labels=df_spring[i].columns.difference(UK_MEAS + KN_MEAS),
-                    axis=1,
-                    inplace=True,
-                )
-                df_spring[i]["gender"] = i
-            elif dbi == 1:
+            if dbi == 1:
                 df_ansuri.append(df)
                 df_ansuri[i].drop(
                     labels=df_ansuri[i].columns.difference(UK_MEAS + KN_MEAS),
@@ -263,12 +279,12 @@ def load_databases():
                 df_ansurii[i]["gender"] = i
 
     ## Concatenate DataFrames
-    df_female = pd.concat([df_spring[0], df_ansuri[0], df_ansurii[0]], axis=0)
-    df_male = pd.concat([df_spring[1], df_ansuri[1], df_ansurii[1]], axis=0)
+    df_female = pd.concat([df_ansuri[0], df_ansurii[0]], axis=0)
+    df_male = pd.concat([df_ansuri[1], df_ansurii[1]], axis=0)
 
     if TEST_FILES == True:
-        df_female = df_female.head(3 * TEST_FILES_NUM) ## 3 because there are 3 datasets (SPRING, ANSURI, ANSURII)
-        df_male = df_male.head(3 * TEST_FILES_NUM) ## 3 because there are 3 datasets (SPRING, ANSURI, ANSURII)
+        df_female = df_female.head(2 * TEST_FILES_NUM)  # 2 datasets
+        df_male = df_male.head(2 * TEST_FILES_NUM)
 
     df_total = pd.concat([df_female, df_male], axis=0)
 
@@ -278,7 +294,7 @@ def load_databases():
 def load_images():
     """
     Loads images from .npz files and concatenates them.
-    Images are loaded from 3 different datasets (SPRING2023, ANSURI2023, ANSURII2023) and for both genders.
+    Images are loaded from ANSURI2023 and ANSURII2023 datasets for both genders.
 
     Returns:
         Tuple of numpy arrays :
@@ -286,78 +302,53 @@ def load_images():
             - imgX_side (numpy array) : concatenated side view images.
     """
 
-    ## NPZ files
-    # Load a list of [image]
-    img_spring = [[] for x in range(2)]  # 0-female, 1-male
     img_ansuri = [[] for x in range(2)]  # 0-female, 1-male
     img_ansurii = [[] for x in range(2)]  # 0-female, 1-male
 
     for g, gender in enumerate(GENDER_DICT.keys()):
-        ## NPZ files
-
+        ## ANSURI
         if TEST_FILES == True:
-            npz_file_name = f"silh_Xarray{IMG_SIZE_4NN}_SPRING_{gender}_bw_{TEST_FILES_NUM}test.npz"
+            npz_file_name = (
+                f"silh_Xarray{IMG_SIZE_4NN}_ANSURI_{gender}_bw_{TEST_FILES_NUM}test.npz"
+            )
         else:
-            npz_file_name = f'silh_Xarray{IMG_SIZE_4NN}_SPRING_{gender}_bw.npz'
+            npz_file_name = f"silh_Xarray{IMG_SIZE_4NN}_ANSURI_{gender}_bw.npz"
 
-        img_spring_npz = np.load(
-            open(
-                os.path.join(
-                    SIL_FILES_DIR_npy, 
-                    f"silhouettes_SPRING_bw", 
-                    npz_file_name
-                ),
-                "rb",
-            ),
-            allow_pickle=True,
-        )
+        
+        npz_path = os.path.join(SIL_FILES_DIR_npy, f"silhouettes_ANSURI_bw", npz_file_name)
+        
+        # Check if file exists
+        if not os.path.exists(npz_path):
+            print(f"ERROR: NPZ file {npz_path} does not exist!")
+            print("You need to run process_blender_silh.py first to create the NPZ files.")
+            sys.exit(1)  # Exit with error
+        
+        img_ansuri_npz = np.load(npz_path, allow_pickle=True)
 
-        if TEST_FILES == True:
-            npz_file_name = f"silh_Xarray{IMG_SIZE_4NN}_ANSURI_{gender}_bw_{TEST_FILES_NUM}test.npz"
-        else:
-            npz_file_name = f'silh_Xarray{IMG_SIZE_4NN}_ANSURI_{gender}_bw.npz'
 
-        img_ansuri_npz = np.load(
-            open(
-                os.path.join(
-                    SIL_FILES_DIR_npy, 
-                    f"silhouettes_ANSURI_bw", 
-                    npz_file_name
-                ),
-                "rb",
-            ),
-            allow_pickle=True,
-        )
-
+        ## ANSURII
         if TEST_FILES == True:
             npz_file_name = f"silh_Xarray{IMG_SIZE_4NN}_ANSURII_{gender}_bw_{TEST_FILES_NUM}test.npz"
         else:
-            npz_file_name = f'silh_Xarray{IMG_SIZE_4NN}_ANSURII_{gender}_bw.npz'
+            npz_file_name = f"silh_Xarray{IMG_SIZE_4NN}_ANSURII_{gender}_bw.npz"
 
-        img_ansurii_npz = np.load(
-            open(
-                os.path.join(
-                    SIL_FILES_DIR_npy, 
-                    f"silhouettes_ANSURII_bw", 
-                    npz_file_name
-                ),
-                "rb",
-            ),
-            allow_pickle=True,
-        )
+
+        npz_path = os.path.join(SIL_FILES_DIR_npy, f"silhouettes_ANSURII_bw", npz_file_name)
+        
+        # Check if file exists
+        if not os.path.exists(npz_path):
+            print(f"ERROR: NPZ file {npz_path} does not exist!")
+            print("You need to run process_blender_silh.py first to create the NPZ files.")
+            sys.exit(1)  # Exit with error
+        
+        img_ansurii_npz = np.load(npz_path, allow_pickle=True)
+        
 
         for i, view in enumerate(VIEWS):
-            img_spring[g].append(img_spring_npz["arr_0"][i, :, :, :])
             img_ansuri[g].append(img_ansuri_npz["arr_0"][i, :, :, :])
             img_ansurii[g].append(img_ansurii_npz["arr_0"][i, :, :, :])
 
     ## DELETE to free memory
-    # Delete npz arrays
-    try:
-        del img_spring_npz
-    except NameError:
-        print("img_spring_npz was already deleted")
-
     try:
         del img_ansuri_npz
     except NameError:
@@ -372,34 +363,29 @@ def load_images():
 
     ## Concatenate NPYarrays
     imgX_front_female = np.concatenate(
-        (img_spring[0][0], img_ansuri[0][0], img_ansurii[0][0]), axis=0
+        (img_ansuri[0][0], img_ansurii[0][0]), axis=0
     )
     imgX_front_male = np.concatenate(
-        (img_spring[1][0], img_ansuri[1][0], img_ansurii[1][0]), axis=0
+        (img_ansuri[1][0], img_ansurii[1][0]), axis=0
     )
 
     imgX_side_female = np.concatenate(
-        (img_spring[0][1], img_ansuri[0][1], img_ansurii[0][1]), axis=0
+        (img_ansuri[0][1], img_ansurii[0][1]), axis=0
     )
     imgX_side_male = np.concatenate(
-        (img_spring[1][1], img_ansuri[1][1], img_ansurii[1][1]), axis=0
+        (img_ansuri[1][1], img_ansurii[1][1]), axis=0
     )
 
     ## DELETE to free memory
     try:
-        del img_spring
-    except NameError:
-        print("img_spring[0] was already deleted")
-
-    try:
         del img_ansuri
     except NameError:
-        print("img_spring[0] was already deleted")
+        print("img_ansuri was already deleted")
 
     try:
         del img_ansurii
     except NameError:
-        print("img_spring[0] was already deleted")
+        print("img_ansurii was already deleted")
 
     gc.collect()
 
@@ -445,9 +431,7 @@ def process_db_values(df, train, test):
     """
 
     cs = SCALER
-    trainContinuous = cs.fit_transform(
-        train[CONTINUOUS]
-    )  
+    trainContinuous = cs.fit_transform(train[CONTINUOUS])
     testContinuous = cs.transform(test[CONTINUOUS])  # test[KN_MEAS - CATEGORICAL]
 
     # one-hot encode the GENDER categorical data (by definition of
@@ -485,11 +469,9 @@ def createMLP_model(in_MLPlayers=1):
         A Keras Model object.
     """
 
-    mlp_input = Input(shape=INP_SHAPE, name="mlp_input")
+    mlp_input = Input(shape=(INP_SHAPE,), name="mlp_input")
 
-    mlp_hidden = Dense(
-        16, activation="relu", name="mlp_hidden1"
-    )(mlp_input)
+    mlp_hidden = Dense(16, activation="relu", name="mlp_hidden1")(mlp_input)
 
     for i in range(in_MLPlayers):
         mlp_hidden = Dense(
@@ -498,9 +480,7 @@ def createMLP_model(in_MLPlayers=1):
             name=f"mlp_hiddenInner{i+1}",
         )(mlp_hidden)
 
-    mlp_hidden = Dense(
-        64, activation="relu", name="mlp_hidden2"
-    )(mlp_hidden)
+    mlp_hidden = Dense(64, activation="relu", name="mlp_hidden2")(mlp_hidden)
 
     mlp_output = Dense(len(UK_MEAS), activation="linear", name="mlp_output")(mlp_hidden)
 
@@ -510,6 +490,8 @@ def createMLP_model(in_MLPlayers=1):
 
 KERNEL_SIZE = (3, 3)  #  (3,3)
 POOL_SIZE = (3, 3)  #  (3,3)
+
+
 def createCNN_model(in_CNNlayers=1, in_DENSElayers=0):
     """
     Creates the CNN model with (modified) AlexNet architecture for image inputs
@@ -531,7 +513,7 @@ def createCNN_model(in_CNNlayers=1, in_DENSElayers=0):
 
     cnn_hidden = maxpool
 
-    ## CNN inner   
+    ## CNN inner
     for i in range(in_CNNlayers):
         cnn_hidden = Conv2D(
             128,
@@ -543,7 +525,7 @@ def createCNN_model(in_CNNlayers=1, in_DENSElayers=0):
         ## Inner maxpool
         cnn_hidden = MaxPooling2D(pool_size=POOL_SIZE)(cnn_hidden)
 
-    ## CNN2    
+    ## CNN2
     cnn_hidden = Conv2D(
         64,
         KERNEL_SIZE,
@@ -554,9 +536,7 @@ def createCNN_model(in_CNNlayers=1, in_DENSElayers=0):
 
     flatten = Flatten()(maxpool)
 
-    dense_hidden = Dense(
-        500, activation="relu", name="dense_hidden1"
-    )(flatten)
+    dense_hidden = Dense(500, activation="relu", name="dense_hidden1")(flatten)
     dense_hidden = Dropout(0.3)(dense_hidden)
 
     for i in range(in_DENSElayers):
@@ -567,9 +547,7 @@ def createCNN_model(in_CNNlayers=1, in_DENSElayers=0):
         )(dense_hidden)
         dense_hidden = Dropout(0.0)(dense_hidden)
 
-    dense_hidden = Dense(
-        200, activation="relu", name="dense_hidden2"
-    )(dense_hidden)
+    dense_hidden = Dense(200, activation="relu", name="dense_hidden2")(dense_hidden)
     dense_hidden = Dropout(0.5)(dense_hidden)
 
     ######################################################################
@@ -605,9 +583,9 @@ def generator2imgsNumData(datagen, MeasX, ImgXf, ImgXs, MeasY, batch_size):  # M
     genS = datagen.flow(ImgXs, MeasY, batch_size=batch_size, shuffle=False, seed=321)
 
     while True:
-        Xni = genNum.next()
-        Xfi = genF.next()
-        Xsi = genS.next()
+        Xni = next(genNum)
+        Xfi = next(genF)
+        Xsi = next(genS)
         yield [Xni[1], Xfi[0], Xsi[0]], Xfi[1]
 
 
@@ -616,7 +594,7 @@ def createCombined_model(MLP_model, CNN_model):
     Creates the final combined model by merging the outputs of the MLP model and the CNN model
     """
 
-    input_numca = Input(shape=INP_SHAPE, name="input_numca")
+    input_numca = Input(shape=(INP_SHAPE,), name="input_numca")
     input_front = Input((IMG_SIZE_4NN, IMG_SIZE_4NN, CHAN), name="input_front")
     input_side = Input((IMG_SIZE_4NN, IMG_SIZE_4NN, CHAN), name="input_side")
 
@@ -630,9 +608,13 @@ def createCombined_model(MLP_model, CNN_model):
     )
 
     ## Our final FC layer head will have X dense layers, the final one being our regression head
-    combined_hidden = Dense(len(UK_MEAS) * 2, activation="relu", name="combined_hidden")(combinedInput)
+    combined_hidden = Dense(
+        len(UK_MEAS) * 2, activation="relu", name="combined_hidden"
+    )(combinedInput)
 
-    combinedOutput = Dense(len(UK_MEAS), activation="linear", name="combined_output")(combined_hidden)
+    combinedOutput = Dense(len(UK_MEAS), activation="linear", name="combined_output")(
+        combined_hidden
+    )
 
     return Model(inputs=[input_numca, input_front, input_side], outputs=combinedOutput)
 
@@ -650,9 +632,11 @@ def histplot(history, model_name, acc_metric="mean_absolute_error"):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
 
     if TEST_FILES == True:
-        fig.suptitle(f"Model accuracy - SPRING+ANSUR_imgInputs DataAugmentation (test{TEST_FILES_NUM}))")
+        fig.suptitle(
+            f"Model accuracy - ANSUR_imgInputs DataAugmentation (test{TEST_FILES_NUM}))"
+        )
     else:
-        fig.suptitle(f"Model accuracy - SPRING+ANSUR_imgInputs DataAugmentation")
+        fig.suptitle(f"Model accuracy - ANSUR_imgInputs DataAugmentation")
 
     hist.plot(y=["loss", "val_loss"], ax=ax1)
 
@@ -704,13 +688,12 @@ def histplot(history, model_name, acc_metric="mean_absolute_error"):
         label=f"min(val_{acc_metric})" + " = {:.3f}".format(min_val_acc),
     )
 
-    ax2.legend(loc="upper right")  
+    ax2.legend(loc="upper right")
 
-    fig_name = model_name.split('.')[0] + "_hist"
+    fig_name = model_name.split(".")[0] + "_hist"
     fig.savefig(os.path.join(MODEL_FILES_DIR, f"{fig_name}.png"))
 
 
-
 if __name__ == "__main__":
-  
-  main()
+
+    main()

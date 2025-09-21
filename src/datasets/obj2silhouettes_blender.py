@@ -8,9 +8,10 @@ GENDERS = ["female", "male"]
 DATASETS = ['ANSURI', 'ANSURII']
 VIEWS = ['front', 'side']
 
-DATA_DIR = '/media/jesus/GSUS-DATA/CANADA_docs/'  \
-                    'RaymondSpiteri_USASK_SK/Papers_SIMLAB_Jesus/'  \
-                    'BodyMeasExtractionNN/human-body-reshape-DL-paper/data'
+# DATA_DIR = '/media/jesus/GSUS-DATA/CANADA_docs/'  \
+#                     'RaymondSpiteri_USASK_SK/Papers_SIMLAB_Jesus/'  \
+#                     'BodyMeasExtractionNN/human-body-reshape-DL-paper/data'
+DATA_DIR = r'C:\Users\LENOVO\Desktop\Kekious_Maximus\human-body-reshape-DL-paper\data'
 
 OBJ_FILES_DIR = os.path.join(DATA_DIR, "obj_files")
 
