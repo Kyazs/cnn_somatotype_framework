@@ -20,6 +20,17 @@ if gpus:
 else:
     print("\nNo GPU detected - training will run on CPU\n")
 
+# Enable mixed precision for better performance and memory efficiency
+try:
+    policy = tf.keras.mixed_precision.Policy('mixed_float16')
+    tf.keras.mixed_precision.set_global_policy(policy)
+    print(f"Mixed precision enabled: {policy.name}")
+    print(f"Compute dtype: {policy.compute_dtype}")
+    print(f"Variable dtype: {policy.variable_dtype}\n")
+except Exception as e:
+    print(f"Mixed precision setup failed: {e}")
+    print("Continuing with default float32 precision\n")
+
 from sklearn.model_selection import train_test_split
 
 from tensorflow import keras
@@ -37,6 +48,10 @@ from tensorflow.keras.layers import (
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+import psutil
+import os
+import time
+import datetime
 
 import sys
 
@@ -141,6 +156,19 @@ def main():
     print(f"testMeasX.shape = {testMeasX.shape}\n")
 
     #############################################
+    ### Create tf.data Datasets for Memory Efficiency
+    #############################################
+    
+    batch_size = 32  # NN_PARAMETERS["batch_size"]
+    
+    # Create memory-efficient tf.data datasets
+    train_dataset, val_dataset = create_tf_datasets(
+        trainMeasX, trainImgXf, trainImgXs, trainMeasY,
+        testMeasX, testImgXf, testImgXs, testMeasY,
+        batch_size=batch_size
+    )
+
+    #############################################
     ### MLP + CNN Model
     #############################################
 
@@ -180,47 +208,80 @@ def main():
     print(Combined_model.summary())
 
     #############################################
+    ### Setup Robust Training Infrastructure
+    #############################################
+    
+    # Create robust callbacks for monitoring and checkpointing
+    callbacks_list, emergency_callback = create_robust_callbacks(MODEL_FILES_DIR, TEST_FILES)
+    
+    # Check for checkpoint resume
+    resume_from_checkpoint = emergency_callback.check_for_resume()
+    if resume_from_checkpoint:
+        try:
+            print("Loading model from emergency checkpoint...")
+            Combined_model = tf.keras.models.load_model(emergency_callback.emergency_file)
+            print("Successfully resumed from checkpoint!")
+        except Exception as e:
+            print(f"Failed to load checkpoint: {e}")
+            print("Starting training from scratch...")
+
+    #############################################
+    ## Compile with Mixed Precision Support
+    #############################################
     ## Compile the model using MeanSquaredError as our loss,
     ## implying that we seek to minimize the squared difference - mse
     opt = Adam(1e-4)
     # opt = build_optimizer(NN_PARAMETERS["optimizer"], NN_PARAMETERS["learning_rate"])
     lo = "mse"
     met = ["mean_absolute_error"]
+    
+    # For mixed precision, we need to wrap the optimizer
+    if tf.keras.mixed_precision.global_policy().name == 'mixed_float16':
+        opt = tf.keras.mixed_precision.LossScaleOptimizer(opt)
+        print("Using loss-scaled optimizer for mixed precision training")
+    
     Combined_model.compile(loss=lo, optimizer=opt, metrics=met)
 
-    batch_size = 32  # NN_PARAMETERS["batch_size"]
+    print(f"\n{'='*60}")
+    print("ROBUST TRAINING CONFIGURATION")
+    print(f"{'='*60}")
+    print(f"Mixed Precision: {tf.keras.mixed_precision.global_policy().name}")
+    print(f"Optimizer: {type(opt).__name__}")
+    print(f"Batch Size: {batch_size}")
+    print(f"Dataset Type: tf.data.Dataset (memory optimized)")
+    print(f"Callbacks: {len(callbacks_list)} monitoring callbacks enabled")
+    print(f"{'='*60}\n")
 
-    """### Train and save the model"""
-
-    # Note: Using direct data instead of generators for simplicity
-    # training_data_gen = generator2imgsNumData(
-    #     datagen, trainMeasX, trainImgXf, trainImgXs, trainMeasY, batch_size
-    # )
-    # validation_data_gen = generator2imgsNumData(
-    #     datagen, testMeasX, testImgXf, testImgXs, testMeasY, batch_size
-    # )
-
-    ## Instantiate an early stopping callback
-    early_stopping = EarlyStopping(
-        monitor="val_loss", min_delta=1e-4, patience=10, restore_best_weights=True
-    )
+    """### Train and save the model with robust infrastructure"""
 
     if TEST_FILES == True:
         EPOCHS = 20
     else:
         EPOCHS = 500
 
-    ## Train the model
-    print("[INFO] training model...")
-    Combined_history = Combined_model.fit(
-        [trainMeasX, trainImgXf, trainImgXs],
-        trainMeasY,
-        validation_data=([testMeasX, testImgXf, testImgXs], testMeasY),
-        batch_size=batch_size,
-        verbose=2,
-        epochs=EPOCHS,
-        callbacks=[early_stopping],
-    )
+    ## Train the model with robust monitoring
+    print("[INFO] Starting robust training with comprehensive monitoring...")
+    try:
+        Combined_history = Combined_model.fit(
+            train_dataset,
+            validation_data=val_dataset,
+            verbose=2,
+            epochs=EPOCHS,
+            callbacks=callbacks_list,
+        )
+        
+        print("\n[SUCCESS] Training completed successfully!")
+        
+    except KeyboardInterrupt:
+        print("\n[INFO] Training interrupted by user")
+        print("Emergency checkpoint should be available for resuming")
+        return
+        
+    except Exception as e:
+        print(f"\n[ERROR] Training failed with exception: {e}")
+        print("Emergency checkpoint should be available for resuming")
+        print("Check system resources and try resuming from checkpoint")
+        raise
 
     gc.collect()
 
@@ -476,6 +537,247 @@ def load_images():
 
     return imgX_front, imgX_side
 
+
+def create_tf_datasets(trainMeasX, trainImgXf, trainImgXs, trainMeasY, 
+                      testMeasX, testImgXf, testImgXs, testMeasY, batch_size=32):
+    """
+    Create tf.data.Dataset objects for better memory management and performance.
+    
+    Args:
+        trainMeasX, trainImgXf, trainImgXs, trainMeasY: Training data
+        testMeasX, testImgXf, testImgXs, testMeasY: Testing data
+        batch_size: Batch size for training
+        
+    Returns:
+        Tuple of (train_dataset, val_dataset)
+    """
+    print("Creating tf.data datasets for memory-efficient training...")
+    
+    # Create training dataset
+    train_dataset = tf.data.Dataset.from_tensor_slices({
+        'numerical': trainMeasX,
+        'front_images': trainImgXf,
+        'side_images': trainImgXs,
+        'targets': trainMeasY
+    })
+    
+    # Create validation dataset
+    val_dataset = tf.data.Dataset.from_tensor_slices({
+        'numerical': testMeasX,
+        'front_images': testImgXf,
+        'side_images': testImgXs,
+        'targets': testMeasY
+    })
+    
+    # Configure training dataset with optimizations
+    train_dataset = (train_dataset
+                    .shuffle(buffer_size=1000)
+                    .batch(batch_size)
+                    .map(lambda x: ([x['numerical'], x['front_images'], x['side_images']], x['targets']),
+                         num_parallel_calls=tf.data.AUTOTUNE)
+                    .prefetch(tf.data.AUTOTUNE))
+    
+    # Configure validation dataset
+    val_dataset = (val_dataset
+                  .batch(batch_size)
+                  .map(lambda x: ([x['numerical'], x['front_images'], x['side_images']], x['targets']),
+                       num_parallel_calls=tf.data.AUTOTUNE)
+                  .prefetch(tf.data.AUTOTUNE))
+    
+    print(f"Train dataset: {train_dataset}")
+    print(f"Validation dataset: {val_dataset}")
+    
+    return train_dataset, val_dataset
+
+
+class MemoryMonitorCallback(tf.keras.callbacks.Callback):
+    """Monitor system memory and GPU memory usage during training."""
+    
+    def __init__(self, log_frequency=10):
+        super().__init__()
+        self.log_frequency = log_frequency
+        
+    def on_epoch_end(self, epoch, logs=None):
+        if epoch % self.log_frequency == 0:
+            # System memory
+            memory = psutil.virtual_memory()
+            print(f"\n[Memory Monitor] Epoch {epoch}:")
+            print(f"  System RAM: {memory.percent:.1f}% used ({memory.used/1e9:.1f}GB/{memory.total/1e9:.1f}GB)")
+            
+            # GPU memory if available
+            gpus = tf.config.list_physical_devices("GPU")
+            if gpus:
+                try:
+                    gpu_details = tf.config.experimental.get_memory_info('GPU:0')
+                    gpu_used = gpu_details['current'] / 1e6  # Convert to MB
+                    gpu_peak = gpu_details['peak'] / 1e6
+                    print(f"  GPU Memory: Current {gpu_used:.0f}MB, Peak {gpu_peak:.0f}MB")
+                except:
+                    print("  GPU memory info not available")
+            
+            # Check for memory pressure
+            if memory.percent > 90:
+                print(f"  WARNING: High system memory usage ({memory.percent:.1f}%)")
+            
+            print()
+
+
+class EmergencyCheckpointCallback(tf.keras.callbacks.Callback):
+    """Save emergency checkpoints and handle recovery from crashes."""
+    
+    def __init__(self, checkpoint_dir, save_frequency=25):
+        super().__init__()
+        self.checkpoint_dir = checkpoint_dir
+        self.save_frequency = save_frequency
+        self.emergency_file = os.path.join(checkpoint_dir, "emergency_checkpoint.keras")
+        self.training_log = os.path.join(checkpoint_dir, "training_progress.txt")
+        
+        # Create checkpoint directory
+        os.makedirs(checkpoint_dir, exist_ok=True)
+        
+        # Initialize training log
+        with open(self.training_log, 'w') as f:
+            f.write(f"Training started at: {datetime.datetime.now()}\n")
+    
+    def on_train_begin(self, logs=None):
+        print(f"Emergency checkpoints will be saved to: {self.checkpoint_dir}")
+        print(f"Checkpoint frequency: every {self.save_frequency} epochs")
+    
+    def on_epoch_end(self, epoch, logs=None):
+        # Save emergency checkpoint periodically
+        if epoch % self.save_frequency == 0:
+            self.model.save(self.emergency_file, overwrite=True)
+            print(f"\n[Emergency Checkpoint] Saved at epoch {epoch}")
+        
+        # Log progress
+        with open(self.training_log, 'a') as f:
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            loss = logs.get('loss', 'N/A')
+            val_loss = logs.get('val_loss', 'N/A')
+            f.write(f"{timestamp} - Epoch {epoch}: loss={loss}, val_loss={val_loss}\n")
+    
+    def check_for_resume(self):
+        """Check if there's a checkpoint to resume from."""
+        if os.path.exists(self.emergency_file):
+            print(f"\nFound emergency checkpoint: {self.emergency_file}")
+            response = input("Do you want to resume from this checkpoint? (y/n): ")
+            if response.lower() == 'y':
+                return True
+        return False
+
+
+class TrainingMonitorCallback(tf.keras.callbacks.Callback):
+    """Monitor training progress and detect anomalies."""
+    
+    def __init__(self):
+        super().__init__()
+        self.loss_history = []
+        self.val_loss_history = []
+        self.training_start_time = None
+        self.epoch_times = []
+    
+    def on_train_begin(self, logs=None):
+        self.training_start_time = time.time()
+        print(f"\n[Training Monitor] Training started at {datetime.datetime.now()}")
+    
+    def on_epoch_begin(self, epoch, logs=None):
+        self.epoch_start_time = time.time()
+    
+    def on_epoch_end(self, epoch, logs=None):
+        epoch_time = time.time() - self.epoch_start_time
+        self.epoch_times.append(epoch_time)
+        
+        loss = logs.get('loss', 0)
+        val_loss = logs.get('val_loss', 0)
+        self.loss_history.append(loss)
+        self.val_loss_history.append(val_loss)
+        
+        # Check for training anomalies
+        if epoch > 10:  # Wait for some epochs before checking
+            recent_avg = np.mean(self.loss_history[-5:])
+            overall_avg = np.mean(self.loss_history)
+            
+            # Check for training stagnation
+            if len(self.loss_history) > 20:
+                recent_20 = self.loss_history[-20:]
+                if max(recent_20) - min(recent_20) < 0.001:  # Very small variation
+                    print(f"\n[Warning] Training may be stagnating (loss variation < 0.001 over last 20 epochs)")
+            
+            # Check for unusual epoch times
+            if len(self.epoch_times) > 5:
+                avg_time = np.mean(self.epoch_times[-10:])
+                if epoch_time > avg_time * 2:
+                    print(f"\n[Warning] Epoch {epoch} took unusually long: {epoch_time:.1f}s (avg: {avg_time:.1f}s)")
+        
+        # Estimate remaining time
+        if epoch > 0:
+            avg_epoch_time = np.mean(self.epoch_times)
+            total_epochs = self.params.get('epochs', 500)
+            remaining_epochs = total_epochs - epoch - 1
+            remaining_time = remaining_epochs * avg_epoch_time
+            hours, remainder = divmod(remaining_time, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            
+            if epoch % 50 == 0:  # Print every 50 epochs
+                print(f"\n[Training Monitor] Estimated remaining time: {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}")
+    
+    def on_train_end(self, logs=None):
+        total_time = time.time() - self.training_start_time
+        hours, remainder = divmod(total_time, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        print(f"\n[Training Monitor] Training completed in {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}")
+
+
+def create_robust_callbacks(model_files_dir, test_files=False):
+    """Create a comprehensive set of callbacks for robust training."""
+    callbacks = []
+    
+    # Early stopping
+    early_stopping = EarlyStopping(
+        monitor="val_loss", 
+        min_delta=1e-4, 
+        patience=15,  # Increased patience for more stability
+        restore_best_weights=True,
+        verbose=1
+    )
+    callbacks.append(early_stopping)
+    
+    # Regular model checkpointing (best model)
+    checkpoint_file = os.path.join(model_files_dir, "best_model_checkpoint.keras")
+    model_checkpoint = ModelCheckpoint(
+        checkpoint_file,
+        monitor='val_loss',
+        save_best_only=True,
+        save_weights_only=False,
+        verbose=1
+    )
+    callbacks.append(model_checkpoint)
+    
+    # Emergency checkpointing
+    emergency_dir = os.path.join(model_files_dir, "emergency_checkpoints")
+    emergency_callback = EmergencyCheckpointCallback(emergency_dir, save_frequency=25)
+    callbacks.append(emergency_callback)
+    
+    # Memory monitoring
+    memory_callback = MemoryMonitorCallback(log_frequency=20)
+    callbacks.append(memory_callback)
+    
+    # Training monitoring
+    training_monitor = TrainingMonitorCallback()
+    callbacks.append(training_monitor)
+    
+    # Reduce learning rate on plateau
+    reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(
+        monitor='val_loss',
+        factor=0.5,
+        patience=10,
+        min_lr=1e-7,
+        verbose=1
+    )
+    callbacks.append(reduce_lr)
+    
+    return callbacks, emergency_callback
+
 def process_db_values(df, train, test):
     """
     Performs min-max scaling each continuous feature column to the range [0, 1]
@@ -541,7 +843,11 @@ def createMLP_model(in_MLPlayers=1):
 
     mlp_hidden = Dense(64, activation="relu", name="mlp_hidden2")(mlp_hidden)
 
-    mlp_output = Dense(len(UK_MEAS), activation="linear", name="mlp_output")(mlp_hidden)
+    # For mixed precision, ensure output layer uses float32
+    if tf.keras.mixed_precision.global_policy().name == 'mixed_float16':
+        mlp_output = Dense(len(UK_MEAS), activation="linear", name="mlp_output", dtype='float32')(mlp_hidden)
+    else:
+        mlp_output = Dense(len(UK_MEAS), activation="linear", name="mlp_output")(mlp_hidden)
 
     ##returns model
     return Model(mlp_input, mlp_output)
@@ -611,9 +917,15 @@ def createCNN_model(in_CNNlayers=1, in_DENSElayers=0):
 
     ######################################################################
 
-    cnn_output = Dense(len(UK_MEAS), activation="linear", name="cnn_output")(
-        dense_hidden
-    )
+    # For mixed precision, ensure output layer uses float32
+    if tf.keras.mixed_precision.global_policy().name == 'mixed_float16':
+        cnn_output = Dense(len(UK_MEAS), activation="linear", name="cnn_output", dtype='float32')(
+            dense_hidden
+        )
+    else:
+        cnn_output = Dense(len(UK_MEAS), activation="linear", name="cnn_output")(
+            dense_hidden
+        )
 
     ##returns model
     return Model(cnn_input, cnn_output)
@@ -671,9 +983,15 @@ def createCombined_model(MLP_model, CNN_model):
         len(UK_MEAS) * 2, activation="relu", name="combined_hidden"
     )(combinedInput)
 
-    combinedOutput = Dense(len(UK_MEAS), activation="linear", name="combined_output")(
-        combined_hidden
-    )
+    # For mixed precision, ensure output layer uses float32
+    if tf.keras.mixed_precision.global_policy().name == 'mixed_float16':
+        combinedOutput = Dense(len(UK_MEAS), activation="linear", name="combined_output", dtype='float32')(
+            combined_hidden
+        )
+    else:
+        combinedOutput = Dense(len(UK_MEAS), activation="linear", name="combined_output")(
+            combined_hidden
+        )
 
     return Model(inputs=[input_numca, input_front, input_side], outputs=combinedOutput)
 
