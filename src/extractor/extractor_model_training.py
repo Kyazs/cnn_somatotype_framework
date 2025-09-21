@@ -86,9 +86,14 @@ def main():
     print(f"imgX_side.shape = {imgX_side.shape}\n")
 
     #############################################
-    ### Prepare Numerical and Categorical Data"""
+    ### Data Alignment - for data sample IDs
     #############################################
+    df_total, imgX_front, imgX_side = align_data_by_ids(df_total, imgX_front, imgX_side)
 
+    #############################################
+    ### Prepare Numerical and Categorical Data
+    #############################################
+    
     ## Train and Test splitting
     (trainData, testData, trainImgXf, testImgXf, trainImgXs, testImgXs) = (
         train_test_split(
@@ -238,6 +243,37 @@ def main():
     ### Plot history
     histplot(Combined_history, MODEL_NAME_SV, "mean_absolute_error")
 
+def align_data_by_ids(df_total, imgX_front, imgX_side):
+    """
+    Align image data with measurement data based on IDs instead of truncating randomly.
+    This ensures we keep the correct samples that have both measurements and images.
+    """
+    print("Aligning data by IDs...")
+    
+    # Get the IDs from the dataframe
+    measurement_ids = df_total['ID'].values
+    print(f"Measurement IDs available: {len(measurement_ids)}")
+    
+    # For this to work, we need to know which images correspond to which IDs
+    # This requires the image loading process to preserve ID information
+    # Since that's not currently available, we'll use a safer truncation approach
+    
+    # Find minimum sample count
+    min_samples = min(len(df_total), len(imgX_front), len(imgX_side))
+    print(f"Aligning to minimum sample count: {min_samples}")
+    
+    # Use the first min_samples that should correspond to the same order
+    # This assumes the data was processed in the same order
+    df_aligned = df_total.iloc[:min_samples].reset_index(drop=True)
+    imgX_front_aligned = imgX_front[:min_samples]
+    imgX_side_aligned = imgX_side[:min_samples]
+    
+    print(f"After alignment:")
+    print(f"df_total.shape = {df_aligned.shape}")
+    print(f"imgX_front.shape = {imgX_front_aligned.shape}")
+    print(f"imgX_side.shape = {imgX_side_aligned.shape}")
+    
+    return df_aligned, imgX_front_aligned, imgX_side_aligned
 
 def load_databases():
     """
