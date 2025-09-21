@@ -133,10 +133,10 @@ UK_MEAS = [
     "shoulder_girth",
     'crotchheight_length',
     # for somatotype predictors
-    "biacromial_breadth",
-    "scye_circ_over_acromion",
-    "ankle_circumference",    
-    "calf_circumference",  
+    "biacromialbreadth",      
+    "scyecircoveracromion",  
+    "ankle_girth",            
+    "calf_girth",  
     
 ]
 
