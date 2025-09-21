@@ -242,43 +242,60 @@ def main():
 def load_databases():
     """
     Loads and prepares the databases for further processing.
-
-    The function reads the csv files for each database and gender using the pandas library's pd.read_csv() function,
-    assigns them to different DataFrames, and drops unnecessary columns. Additionally, it adds a "gender" column to
-    each DataFrame and concatenates them into one DataFrame.
     """
+    file_encoding = "ISO-8859-1"
 
-    file_encoding = "ISO-8859-1"  # 'utf8'
+    # Initialize lists for each database
+    df_ansuri = [None, None]  # [female, male]
+    df_ansurii = [None, None]  # [female, male]
 
-    # df_spring = list()
-    df_ansuri = list()
-    df_ansurii = list()
-
-    for dbi, dbname in enumerate(DBNAMES):
-        if dbi == 0:
-            continue  # Skip SPRING
+    # Explicitly load ANSURI and ANSURII databases
+    target_databases = ["ANSURI", "ANSURII"]
+    
+    for db_name in target_databases:
         for i, gender in enumerate(GENDER_DICT.keys()):
-            db_dir = os.path.join(DS_DIR, f"measurements_{dbname}_{gender}.csv")
+            db_dir = os.path.join(DS_DIR, f"measurements_{db_name}_{gender}.csv")
+            
+            # Check if the file exists
+            if not os.path.exists(db_dir):
+                print(f"ERROR: File {db_dir} does not exist!")
+                print("Available files:")
+                import glob
+                available_files = glob.glob(os.path.join(DS_DIR, "measurements_*.csv"))
+                for f in available_files:
+                    print(f"  - {os.path.basename(f)}")
+                sys.exit(1)
+                
+            print(f"Loading: {db_dir}")
             df = pd.read_csv(db_dir, encoding=file_encoding, converters={"ID": str})
+            
+            # Remove unwanted columns
+            df.drop(
+                labels=df.columns.difference(UK_MEAS + KN_MEAS),
+                axis=1,
+                inplace=True,
+            )
+            df["gender"] = i
+            
+            # Assign to appropriate list
+            if db_name == "ANSURI":
+                df_ansuri[i] = df
+            elif db_name == "ANSURII":
+                df_ansurii[i] = df
 
-            if dbi == 1:
-                df_ansuri.append(df)
-                df_ansuri[i].drop(
-                    labels=df_ansuri[i].columns.difference(UK_MEAS + KN_MEAS),
-                    axis=1,
-                    inplace=True,
-                )
-                df_ansuri[i]["gender"] = i
-            elif dbi == 2:
-                df_ansurii.append(df)
-                df_ansurii[i].drop(
-                    labels=df_ansurii[i].columns.difference(UK_MEAS + KN_MEAS),
-                    axis=1,
-                    inplace=True,
-                )
-                df_ansurii[i]["gender"] = i
+    # Validate that all required dataframes were loaded
+    if df_ansuri[0] is None or df_ansuri[1] is None:
+        print("ERROR: Missing ANSURI database files")
+        sys.exit(1)
+        
+    if df_ansurii[0] is None or df_ansurii[1] is None:
+        print("ERROR: Missing ANSURII database files")
+        sys.exit(1)
 
-    ## Concatenate DataFrames
+    print(f"Loaded ANSURI: {len(df_ansuri[0])} female, {len(df_ansuri[1])} male")
+    print(f"Loaded ANSURII: {len(df_ansurii[0])} female, {len(df_ansurii[1])} male")
+
+    # Concatenate DataFrames
     df_female = pd.concat([df_ansuri[0], df_ansurii[0]], axis=0)
     df_male = pd.concat([df_ansuri[1], df_ansurii[1]], axis=0)
 
@@ -287,9 +304,9 @@ def load_databases():
         df_male = df_male.head(2 * TEST_FILES_NUM)
 
     df_total = pd.concat([df_female, df_male], axis=0)
-
+    
+    print(f"Total combined dataset: {len(df_total)} samples")
     return df_total
-
 
 def load_images():
     """
@@ -314,17 +331,19 @@ def load_images():
         else:
             npz_file_name = f"silh_Xarray{IMG_SIZE_4NN}_ANSURI_{gender}_bw.npz"
 
-        
-        npz_path = os.path.join(SIL_FILES_DIR_npy, f"silhouettes_ANSURI_bw", npz_file_name)
-        
+        npz_path = os.path.join(
+            SIL_FILES_DIR_npy, f"silhouettes_ANSURI_bw", npz_file_name
+        )
+
         # Check if file exists
         if not os.path.exists(npz_path):
             print(f"ERROR: NPZ file {npz_path} does not exist!")
-            print("You need to run process_blender_silh.py first to create the NPZ files.")
+            print(
+                "You need to run process_blender_silh.py first to create the NPZ files."
+            )
             sys.exit(1)  # Exit with error
-        
-        img_ansuri_npz = np.load(npz_path, allow_pickle=True)
 
+        img_ansuri_npz = np.load(npz_path, allow_pickle=True)
 
         ## ANSURII
         if TEST_FILES == True:
@@ -332,17 +351,19 @@ def load_images():
         else:
             npz_file_name = f"silh_Xarray{IMG_SIZE_4NN}_ANSURII_{gender}_bw.npz"
 
+        npz_path = os.path.join(
+            SIL_FILES_DIR_npy, f"silhouettes_ANSURII_bw", npz_file_name
+        )
 
-        npz_path = os.path.join(SIL_FILES_DIR_npy, f"silhouettes_ANSURII_bw", npz_file_name)
-        
         # Check if file exists
         if not os.path.exists(npz_path):
             print(f"ERROR: NPZ file {npz_path} does not exist!")
-            print("You need to run process_blender_silh.py first to create the NPZ files.")
+            print(
+                "You need to run process_blender_silh.py first to create the NPZ files."
+            )
             sys.exit(1)  # Exit with error
-        
+
         img_ansurii_npz = np.load(npz_path, allow_pickle=True)
-        
 
         for i, view in enumerate(VIEWS):
             img_ansuri[g].append(img_ansuri_npz["arr_0"][i, :, :, :])
@@ -362,19 +383,11 @@ def load_images():
     gc.collect()
 
     ## Concatenate NPYarrays
-    imgX_front_female = np.concatenate(
-        (img_ansuri[0][0], img_ansurii[0][0]), axis=0
-    )
-    imgX_front_male = np.concatenate(
-        (img_ansuri[1][0], img_ansurii[1][0]), axis=0
-    )
+    imgX_front_female = np.concatenate((img_ansuri[0][0], img_ansurii[0][0]), axis=0)
+    imgX_front_male = np.concatenate((img_ansuri[1][0], img_ansurii[1][0]), axis=0)
 
-    imgX_side_female = np.concatenate(
-        (img_ansuri[0][1], img_ansurii[0][1]), axis=0
-    )
-    imgX_side_male = np.concatenate(
-        (img_ansuri[1][1], img_ansurii[1][1]), axis=0
-    )
+    imgX_side_female = np.concatenate((img_ansuri[0][1], img_ansurii[0][1]), axis=0)
+    imgX_side_male = np.concatenate((img_ansuri[1][1], img_ansurii[1][1]), axis=0)
 
     ## DELETE to free memory
     try:
