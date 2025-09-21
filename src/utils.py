@@ -20,7 +20,8 @@ OBJ_FILES_ANSURII = os.path.join(OBJ_FILES_DIR, "obj_database_ANSURII")
 
 GENDERS = ["female", "male"]
 DATASETS = ['ANSURI', 'ANSURII']
-DBNAMES = ['SPRING'] + DATASETS
+# DBNAMES = ['SPRING'] + DATASETS
+DBNAMES = DATASETS
 VIEWS = ['front', 'side']
 
 OBJ_FILES_DS_DIR_DICT = {
