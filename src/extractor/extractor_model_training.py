@@ -570,31 +570,40 @@ def create_tf_datasets(trainMeasX, trainImgXf, trainImgXs, trainMeasY,
     print(f"  trainImgXs: {trainImgXs.shape}")
     print(f"  trainMeasY: {trainMeasY.shape}")
     
-    # Create training dataset - separate tensors for each input
-    train_dataset = tf.data.Dataset.from_tensor_slices((trainMeasX, trainImgXf, trainImgXs, trainMeasY))
+    # Create separate datasets for each input to avoid shape conflicts
+    train_num_dataset = tf.data.Dataset.from_tensor_slices(trainMeasX)
+    train_front_dataset = tf.data.Dataset.from_tensor_slices(trainImgXf)
+    train_side_dataset = tf.data.Dataset.from_tensor_slices(trainImgXs)
+    train_target_dataset = tf.data.Dataset.from_tensor_slices(trainMeasY)
     
-    # Create validation dataset 
-    val_dataset = tf.data.Dataset.from_tensor_slices((testMeasX, testImgXf, testImgXs, testMeasY))
+    val_num_dataset = tf.data.Dataset.from_tensor_slices(testMeasX)
+    val_front_dataset = tf.data.Dataset.from_tensor_slices(testImgXf)
+    val_side_dataset = tf.data.Dataset.from_tensor_slices(testImgXs)
+    val_target_dataset = tf.data.Dataset.from_tensor_slices(testMeasY)
+    
+    # Zip datasets together (this maintains separate tensors)
+    train_dataset = tf.data.Dataset.zip((train_num_dataset, train_front_dataset, train_side_dataset, train_target_dataset))
+    val_dataset = tf.data.Dataset.zip((val_num_dataset, val_front_dataset, val_side_dataset, val_target_dataset))
     
     # Configure training dataset with optimizations
-    def format_data(numerical, front_img, side_img, targets):
-        """Format data for model input: ([num, front, side], targets)"""
-        return ([numerical, front_img, side_img], targets)
+    def format_inputs(numerical, front_img, side_img, targets):
+        """Format inputs for the model: returns ([num, front, side], targets)"""
+        return [numerical, front_img, side_img], targets
     
     train_dataset = (train_dataset
                     .shuffle(buffer_size=1000)
                     .batch(batch_size)
-                    .map(format_data, num_parallel_calls=tf.data.AUTOTUNE)
+                    .map(format_inputs, num_parallel_calls=tf.data.AUTOTUNE)
                     .prefetch(tf.data.AUTOTUNE))
     
     # Configure validation dataset
     val_dataset = (val_dataset
                   .batch(batch_size)
-                  .map(format_data, num_parallel_calls=tf.data.AUTOTUNE)
+                  .map(format_inputs, num_parallel_calls=tf.data.AUTOTUNE)
                   .prefetch(tf.data.AUTOTUNE))
     
-    print(f"Train dataset: {train_dataset}")
-    print(f"Validation dataset: {val_dataset}")
+    print(f"Train dataset created successfully")
+    print(f"Validation dataset created successfully")
     
     return train_dataset, val_dataset
 
