@@ -322,6 +322,8 @@ def load_images():
     img_ansuri = [[] for x in range(2)]  # 0-female, 1-male
     img_ansurii = [[] for x in range(2)]  # 0-female, 1-male
 
+    total_samples = 0
+
     for g, gender in enumerate(GENDER_DICT.keys()):
         ## ANSURI
         if TEST_FILES == True:
@@ -335,15 +337,15 @@ def load_images():
             SIL_FILES_DIR_npy, f"silhouettes_ANSURI_bw", npz_file_name
         )
 
-        # Check if file exists
         if not os.path.exists(npz_path):
             print(f"ERROR: NPZ file {npz_path} does not exist!")
-            print(
-                "You need to run process_blender_silh.py first to create the NPZ files."
-            )
-            sys.exit(1)  # Exit with error
+            sys.exit(1)
 
+        print(f"Loading ANSURI {gender}: {npz_path}")
         img_ansuri_npz = np.load(npz_path, allow_pickle=True)
+        print(f"  - Shape: {img_ansuri_npz['arr_0'].shape}")
+        print(f"  - Samples: {img_ansuri_npz['arr_0'].shape[1]}")
+        total_samples += img_ansuri_npz['arr_0'].shape[1]
 
         ## ANSURII
         if TEST_FILES == True:
@@ -355,20 +357,24 @@ def load_images():
             SIL_FILES_DIR_npy, f"silhouettes_ANSURII_bw", npz_file_name
         )
 
-        # Check if file exists
         if not os.path.exists(npz_path):
             print(f"ERROR: NPZ file {npz_path} does not exist!")
-            print(
-                "You need to run process_blender_silh.py first to create the NPZ files."
-            )
-            sys.exit(1)  # Exit with error
+            sys.exit(1)
 
+        print(f"Loading ANSURII {gender}: {npz_path}")
         img_ansurii_npz = np.load(npz_path, allow_pickle=True)
+        print(f"  - Shape: {img_ansurii_npz['arr_0'].shape}")
+        print(f"  - Samples: {img_ansurii_npz['arr_0'].shape[1]}")
+        total_samples += img_ansurii_npz['arr_0'].shape[1]
 
         for i, view in enumerate(VIEWS):
             img_ansuri[g].append(img_ansuri_npz["arr_0"][i, :, :, :])
             img_ansurii[g].append(img_ansurii_npz["arr_0"][i, :, :, :])
 
+    print(f"Total image samples loaded: {total_samples}")
+
+    # ... rest of the function remains the same ...
+    
     ## DELETE to free memory
     try:
         del img_ansuri_npz
@@ -389,6 +395,12 @@ def load_images():
     imgX_side_female = np.concatenate((img_ansuri[0][1], img_ansurii[0][1]), axis=0)
     imgX_side_male = np.concatenate((img_ansuri[1][1], img_ansurii[1][1]), axis=0)
 
+    print(f"After concatenation:")
+    print(f"  - Front female: {imgX_front_female.shape}")
+    print(f"  - Front male: {imgX_front_male.shape}")
+    print(f"  - Side female: {imgX_side_female.shape}") 
+    print(f"  - Side male: {imgX_side_male.shape}")
+
     ## DELETE to free memory
     try:
         del img_ansuri
@@ -405,6 +417,10 @@ def load_images():
     imgX_front = np.concatenate((imgX_front_female, imgX_front_male), axis=0)
     imgX_side = np.concatenate((imgX_side_female, imgX_side_male), axis=0)
 
+    print(f"Final shapes:")
+    print(f"  - imgX_front: {imgX_front.shape}")
+    print(f"  - imgX_side: {imgX_side.shape}")
+
     ## DELETE to free memory
     try:
         del imgX_front_female
@@ -416,7 +432,6 @@ def load_images():
     except NameError:
         print("imgX_front_male was already deleted")
 
-    ## DELETE to free memory
     try:
         del imgX_side_female
     except NameError:
@@ -428,7 +443,6 @@ def load_images():
         print("imgX_side_male was already deleted")
 
     return imgX_front, imgX_side
-
 
 def process_db_values(df, train, test):
     """
