@@ -177,14 +177,34 @@ def filter_ds(df, ds):
         df = df.rename(columns=NEW_NAMES_DICT_ansurI, inplace=False)
     elif ds == "ANSURII":
         # estimated_scye_circ = chestcircumference * (interscyei / chestbreadth)
-        df["scyecircoveracromion"] = df.apply(
-            lambda row: row.chestcircumference * (row.interscyei / row.chestbreadth),
-            axis=1,
-        )
-        # compute thigh_length for ANSURII as well
-        df["thigh_length"] = df.apply(
-            lambda row: row.trochanterionheight - row.lateralfemoralepicondyleheight,
-            axis=1,
+        for c in ("chestcircumference", "interscyei", "chestbreadth"):
+            if c not in df.columns:
+                df[c] = np.nan
+
+        # ensure numeric
+        chest = pd.to_numeric(df["chestcircumference"], errors="coerce")
+        inters = pd.to_numeric(df["interscyei"], errors="coerce")
+        breadth = pd.to_numeric(df["chestbreadth"], errors="coerce")
+
+        # safe ratio (breadth small -> nan)
+        breadth_safe = breadth.replace({0: np.nan})
+        ratio = inters / breadth_safe
+
+        scye = chest * ratio
+
+        # sanitize: remove infinities/nans
+        scye = scye.replace([np.inf, -np.inf], np.nan)
+
+        # realistic plausible range in RAW UNITS (mm) — adjust if your files use different units
+        plausible_min_mm = 300.0   # 30 cm
+        plausible_max_mm = 2000.0  # 200 cm
+        scye = scye.where((scye >= plausible_min_mm) & (scye <= plausible_max_mm), other=np.nan)
+
+        df["scyecircoveracromion"] = scye
+
+        # compute thigh_length vectorized (avoid per-row apply)
+        df["thigh_length"] = pd.to_numeric(df.get("trochanterionheight", np.nan), errors="coerce") - pd.to_numeric(
+            df.get("lateralfemoralepicondyleheight", np.nan), errors="coerce"
         )
         # rename columns and only consider MEASUREMENTS
         df = df.rename(columns=NEW_NAMES_DICT_ansurII, inplace=False)
