@@ -200,6 +200,9 @@ def filter_ds(df, ds):
         plausible_max_mm = 2000.0  # 200 cm
         scye = scye.where((scye >= plausible_min_mm) & (scye <= plausible_max_mm), other=np.nan)
 
+        # Convert to cm (since ANSURII is in mm, and we divide whole df by 10 later)
+        scye = scye / 10.0
+
         df["scyecircoveracromion"] = scye
 
         # compute thigh_length vectorized (avoid per-row apply)
