@@ -79,62 +79,6 @@ NEW_NAMES_DICT_ansurII = {
     ANSURII_MEAS[i]: MEASUREMENTS[i] for i in range(len(ANSURII_MEAS))
 }
 
-
-# ---------------------------------------------------------------------------
-# Imputation of missing measurements in SPRING using regressors trained on ANSUR combined
-# ---------------------------------------------------------------------------
-
-def _train_imputer(df_train, target, predictors):
-    df = df_train.dropna(subset=[target] + predictors)
-    if df.shape[0] < 10:
-        return None, None
-    X = df[predictors].to_numpy()
-    y = df[target].to_numpy()
-    Xtr, Xval, ytr, yval = train_test_split(X, y, test_size=0.2, random_state=42)
-    model = Ridge(alpha=1.0)
-    model.fit(Xtr, ytr)
-    ypred = model.predict(Xval)
-    return model, {"r2": r2_score(yval, ypred), "mae": mean_absolute_error(yval, ypred)}
-
-def impute_spring_from_ansur(df_spring, df_ansur_combined, targets=None, predictors=None):
-    """
-    Impute targets in df_spring using regressors trained on df_ansur_combined.
-    Adds boolean columns: <target>_imputed
-    Returns a new DataFrame (copy).
-    """
-    df_s = df_spring.copy()
-    if targets is None:
-        targets = ["biacromialbreadth", "scyecircoveracromion"]
-    if predictors is None:
-        # choose predictors that are present in both and not the targets
-        predictors = [c for c in MEASUREMENTS if c not in targets]
-    # keep numeric predictors only
-    predictors = [p for p in predictors if p in df_s.columns and p in df_ansur_combined.columns]
-    stats = {}
-    for tgt in targets:
-        if tgt not in df_s.columns:
-            df_s[tgt] = np.nan
-        # train on ANSUR combined
-        model, perf = _train_imputer(df_ansur_combined, tgt, predictors)
-        stats[tgt] = perf
-        if model is None:
-            continue
-        miss_mask = df_s[tgt].isna()
-        if miss_mask.any():
-            Xmiss = df_s.loc[miss_mask, predictors].to_numpy()
-            try:
-                preds = model.predict(Xmiss)
-            except Exception:
-                preds = np.full(Xmiss.shape[0], np.nan)
-            df_s.loc[miss_mask, tgt] = preds
-        #     df_s[f"{tgt}_imputed"] = False
-        #     df_s.loc[miss_mask, f"{tgt}_imputed"] = True
-        # else:
-        #     df_s[f"{tgt}_imputed"] = False
-    print("Imputation performance (on ANSUR holdout):", stats)
-    return df_s
-
-
 def generateANSURfiles():
 
     for ds in DATASETS:
@@ -205,6 +149,12 @@ def filter_ds(df, ds):
 
         df["scyecircoveracromion"] = scye
 
+        # Impute NaNs with median to avoid NaN propagation in training
+        if df["scyecircoveracromion"].isna().any():
+            median_val = df["scyecircoveracromion"].median()
+            df["scyecircoveracromion"] = df["scyecircoveracromion"].fillna(median_val)
+            print(f"Imputed {df['scyecircoveracromion'].isna().sum()} NaNs in scyecircoveracromion with median {median_val:.2f}")
+
         # compute thigh_length vectorized (avoid per-row apply)
         df["thigh_length"] = pd.to_numeric(df.get("trochanterionheight", np.nan), errors="coerce") - pd.to_numeric(
             df.get("lateralfemoralepicondyleheight", np.nan), errors="coerce"
@@ -221,10 +171,12 @@ def filter_ds(df, ds):
         df = df.rename(columns=NEW_NAMES_DICT_ansurII, inplace=False)
 
     # Drop columns that are not MEASUREMENTS
-    # Divide by 10 to convert to cm
+    # Divide by 10 to convert to cm (only for ANSURII, ANSURI already in cm)
     # Only use available columns
     available_measurements = [col for col in MEASUREMENTS if col in df.columns]
-    df = df[available_measurements] / 10.0
+    df = df[available_measurements]
+    if ds == "ANSURII":
+        df = df / 10.0
 
     return df
 
