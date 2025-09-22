@@ -37,28 +37,11 @@ FILE_ENCODING = "ISO-8859-1"    # 'utf8'
 
 MEASUREMENTS = ['weight_kg',  # 'height_cm', 'weight_kg
                 'stature_cm', 
-                'neck_base_girth', 
-                'chest_girth',
-                'waist_girth',
-                'hips_buttock_girth',
-                'shoulder_girth',
-                'thigh_girth',
-                'thigh_low_girth',
-                'calf_girth',
-                'ankle_girth',
-                'forearm_girth',
-                'wrist_girth',
-                'shoulder_length',
-                'sleeveoutseam_length',
-                'forearm_length',
-                'crotchheight_length',
-                'waistback_length',
-                'thigh_length',
-                'chest_depth_length',
-                'head_girth',
-                # for somatotype predictors
-                'biacromialbreadth',
-                'scyecircoveracromion']
+                'calf_circumference',
+                'biacromial_breadth',
+                'bicristal_breadth',
+                'waist_circumference',
+                'biceps_circumference_flexed']
 
 M_NUM = len(MEASUREMENTS)
 
@@ -124,20 +107,21 @@ KN_MEAS = [
 ]
 
 UK_MEAS = [
-    'chest_girth',
-    'waist_girth',
-    'hips_buttock_girth',
-    'thigh_girth',
-    'sleeveoutseam_length',
-    'waistback_length',
-    "shoulder_girth",
-    'crotchheight_length',
-    # for somatotype predictors
-    "biacromialbreadth",      
-    "scyecircoveracromion",  
-    "ankle_girth",            
-    "calf_girth",  
+    # 'chest_girth',
+    # 'waist_girth',
+    # 'hips_buttock_girth',
+    # 'thigh_girth',
+    # 'sleeveoutseam_length',
+    # 'waistback_length',
+    # "shoulder_girth",
+    # 'crotchheight_length',
     
+    ## for somatotype predictors
+    "calf_circumference",
+    "biacromial_breadth",
+    "bicristal_breadth",
+    "waist_circumference",
+    "biceps_circumference_flexed"
 ]
 
 CATEGORICAL = ["gender"]
