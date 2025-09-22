@@ -12,7 +12,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import r2_score, mean_absolute_error
 
 
-DS_DIR = "../../data/datasets/"
+DS_DIR = "data/datasets/"
 DS_ANSUR_DIR = os.path.join(DS_DIR, "ds_ansur_original")
 DS_SPRING_DIR = os.path.join(DS_DIR, "ds_SPRING")
 

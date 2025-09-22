@@ -16,8 +16,8 @@ DS_SPRING_DIR = os.path.join(DS_DIR, "ds_SPRING")
 # 1. Define the final, standardized column names you want in your dataset.
 #    This includes your UK_MEAS and any KN_MEAS like weight and stature.
 MEASUREMENTS = [
-    "weight",
-    "stature",
+    "weight_kg",
+    "stature_cm",
     "calf_circumference",
     "biacromial_breadth",
     "bicristal_breadth",

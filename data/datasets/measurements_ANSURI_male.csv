@@ -1,4 +1,4 @@
-weight,stature,calf_circumference,biacromial_breadth,bicristal_breadth,waist_circumference,biceps_circumference_flexed
+weight_kg,stature_cm,calf_circumference,biacromial_breadth,bicristal_breadth,waist_circumference,biceps_circumference_flexed
 883,1735,400,409,225,982,364
 865,1830,400,412,258,976,325
 713,1726,362,432,219,845,308
