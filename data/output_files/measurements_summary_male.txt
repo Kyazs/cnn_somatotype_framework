@@ -1,0 +1,62 @@
+======================================================================
+ANTHROPOMETRIC MEASUREMENTS EXTRACTION SUMMARY
+======================================================================
+
+Subject: Male
+Date: 2025-10-05 13:37:17
+
+EXTRACTED MEASUREMENTS (from CNN Model):
+--------------------------------------------------
+  weight_kg                     : 70
+  stature_cm                    : 158
+  calf_circumference            :    34.90
+  biacromial_breadth            :    40.97
+  bicristal_breadth             :    24.43
+  waist_circumference           :    87.13
+  biceps_circumference_flexed   :    33.74
+
+ESTIMATED/IMPUTED MEASUREMENTS:
+--------------------------------------------------
+  humerus_breadth               :     7.05
+  femur_breadth                 :     8.30
+  triceps_skinfold              :    90.00
+  subscapular_skinfold          :   105.00
+  supraspinale_skinfold         :   105.00
+  medial_calf_skinfold          :    54.00
+  estimated_fat_mass_kg         :    35.00
+  estimated_body_fat_percent    :    50.00
+  estimated_body_density        :     0.95
+  estimated_sum_4_skinfolds_mm  :   300.00
+
+STANDARDIZED ANTHROPOMETRIC DATA:
+--------------------------------------------------
+The following measurements are saved in standardized format:
+  Height                   : N/A      cm
+  Weight                   : N/A      kg
+  Triceps_Skinfold         : 90       mm
+  Subscapular_Skinfold     : 105      mm
+  Supraspinale_Skinfold    : 105      mm
+  Calf_Skinfold            : 54       mm
+  Humerus_Breadth          : 7.0      cm
+  Femur_Breadth            : 8.3      cm
+  Arm_Circumference_Flexed : 33.7     cm
+  Calf_Circumference       : 34.9     cm
+  Waist_Circumference      : 87.1     cm
+  Biacromial_Breadth       : 41.0     cm
+  Bicristal_Breadth        : 24.4     cm
+
+METHODOLOGY SUMMARY:
+--------------------------------------------------
+• Bone breadths estimated using Auerbach & Ruff (2004) regression models
+• Skinfolds estimated using multi-step body fat prediction approach:
+  - Fat mass estimated using NHANES model (Woolcott et al., 2017)
+  - Body density calculated using Siri equation
+  - Sum of 4 skinfolds estimated using Durnin & Womersley (1974)
+  - Individual skinfolds apportioned using physiological ratios
+
+FILE FORMAT NOTES:
+--------------------------------------------------
+• output_anthropometric_data.csv: Standardized format with proper units
+• Skinfold measurements stored in mm (anthropometric standard)
+• Breadths and circumferences in cm
+• Missing values marked as 'N/A'

@@ -1,0 +1,2 @@
+subject_id,gender,weight_kg,stature_cm,calf_circumference,biacromial_breadth,bicristal_breadth,waist_circumference,biceps_circumference_flexed,humerus_breadth,femur_breadth,triceps_skinfold,subscapular_skinfold,supraspinale_skinfold,medial_calf_skinfold,estimated_fat_mass_kg,estimated_body_fat_percent,estimated_body_density,estimated_sum_4_skinfolds_mm
+fromImg_male,male,70,158,34.9,40.97,24.43,87.13,33.74,7.0451999999999995,8.3017,90.0,105.0,105.0,54.0,35.0,50.0,0.95,300.0

@@ -347,82 +347,102 @@ def align_data_by_ids(df_total, imgX_front, imgX_side):
 def load_databases():
     """
     Loads and prepares the databases for further processing.
+    Uses the TOTAL files that combine ANSUR I and II data with proper unit conversions.
     """
-    file_encoding = "ISO-8859-1"
+    file_encoding = FILE_ENCODING  # Use the encoding from utils
 
-    # Initialize lists for each database
-    df_ansuri = [None, None]  # [female, male]
-    df_ansurii = [None, None]  # [female, male]
-
-    # Explicitly load ANSURI and ANSURII databases
-    target_databases = ["ANSURI", "ANSURII"]
+    print("Loading measurement databases...")
     
-    for db_name in target_databases:
-        for i, gender in enumerate(GENDER_DICT.keys()):
-            db_dir = os.path.join(DS_DIR, f"measurements_{db_name}_{gender}.csv")
-            
-            # Check if the file exists
-            if not os.path.exists(db_dir):
-                print(f"ERROR: File {db_dir} does not exist!")
-                print("Available files:")
-                import glob
-                available_files = glob.glob(os.path.join(DS_DIR, "measurements_*.csv"))
-                for f in available_files:
-                    print(f"  - {os.path.basename(f)}")
-                sys.exit(1)
-                
-            print(f"Loading: {db_dir}")
-            df = pd.read_csv(db_dir, encoding=file_encoding, converters={"ID": str})
-            
-            # Remove unwanted columns
-            df.drop(
-                labels=df.columns.difference(UK_MEAS + KN_MEAS),
-                axis=1,
-                inplace=True,
-            )
-            df["gender"] = i
-            
-            # Assign to appropriate list
-            if db_name == "ANSURI":
-                df_ansuri[i] = df
-            elif db_name == "ANSURII":
-                df_ansurii[i] = df
-
-    # Validate that all required dataframes were loaded
-    if df_ansuri[0] is None or df_ansuri[1] is None:
-        print("ERROR: Missing ANSURI database files")
+    # Load the TOTAL files (which contain both ANSUR I and II combined with proper units)
+    tot_db_dir_fem = os.path.join(DS_DIR, "measurements_TOTAL_female.csv")
+    tot_db_dir_mal = os.path.join(DS_DIR, "measurements_TOTAL_male.csv")
+    
+    # Check if files exist
+    if not os.path.exists(tot_db_dir_fem):
+        print(f"ERROR: File {tot_db_dir_fem} does not exist!")
+        print("Make sure you've run the ds_measurements_filter_somatotype.py script to generate TOTAL files")
+        print("Available files:")
+        import glob
+        available_files = glob.glob(os.path.join(DS_DIR, "measurements_*.csv"))
+        for f in available_files:
+            print(f"  - {os.path.basename(f)}")
         sys.exit(1)
         
-    if df_ansurii[0] is None or df_ansurii[1] is None:
-        print("ERROR: Missing ANSURII database files")
+    if not os.path.exists(tot_db_dir_mal):
+        print(f"ERROR: File {tot_db_dir_mal} does not exist!")
+        print("Make sure you've run the ds_measurements_filter_somatotype.py script to generate TOTAL files")
         sys.exit(1)
 
-    print(f"Loaded ANSURI: {len(df_ansuri[0])} female, {len(df_ansuri[1])} male")
-    print(f"Loaded ANSURII: {len(df_ansurii[0])} female, {len(df_ansurii[1])} male")
-
-    # Concatenate DataFrames
-    df_female = pd.concat([df_ansuri[0], df_ansurii[0]], axis=0)
-    df_male = pd.concat([df_ansuri[1], df_ansurii[1]], axis=0)
-
-    if TEST_FILES == True:
-        df_female = df_female.head(2 * TEST_FILES_NUM)  # 2 datasets
-        df_male = df_male.head(2 * TEST_FILES_NUM)
-
-    df_total = pd.concat([df_female, df_male], axis=0)
+    print(f"Loading: {tot_db_dir_fem}")
+    df_female = pd.read_csv(tot_db_dir_fem, encoding=file_encoding, converters={"ID": str})
     
-    print(f"Total combined dataset: {len(df_total)} samples")
+    print(f"Loading: {tot_db_dir_mal}")
+    df_male = pd.read_csv(tot_db_dir_mal, encoding=file_encoding, converters={"ID": str})
+    
+    # Add gender column
+    df_female["gender"] = 0  # Female = 0
+    df_male["gender"] = 1    # Male = 1
+    
+    print(f"Loaded datasets:")
+    print(f"  - Female: {len(df_female)} samples")
+    print(f"  - Male: {len(df_male)} samples")
+    print(f"  - Columns: {list(df_female.columns)}")
+    
+    # Verify we have the required columns
+    required_cols = UK_MEAS + KN_MEAS
+    missing_cols = set(required_cols) - set(df_female.columns)
+    if missing_cols:
+        print(f"ERROR: Missing required columns: {missing_cols}")
+        print(f"Available columns: {list(df_female.columns)}")
+        print(f"Required columns: {required_cols}")
+        sys.exit(1)
+    
+    # Remove unwanted columns (keep only what we need)
+    keep_cols = UK_MEAS + KN_MEAS + ["gender"]
+    df_female = df_female[keep_cols]
+    df_male = df_male[keep_cols]
+    
+    # Apply test file limitation if needed
+    if TEST_FILES == True:
+        print(f"TEST MODE: Limiting to {TEST_FILES_NUM} samples per gender")
+        df_female = df_female.head(TEST_FILES_NUM)
+        df_male = df_male.head(TEST_FILES_NUM)
+
+    # Combine datasets
+    df_total = pd.concat([df_female, df_male], axis=0, ignore_index=True)
+    
+    print(f"Combined dataset: {len(df_total)} samples")
+    print(f"UK_MEAS (output): {UK_MEAS}")
+    print(f"KN_MEAS (input): {KN_MEAS}")
+    
+    # Print statistics for verification
+    print("\nDataset statistics:")
+    print(df_total[UK_MEAS].describe())
+    
+    # Verify the data looks reasonable
+    print("\nVerifying data quality:")
+    for col in UK_MEAS:
+        mean_val = df_total[col].mean()
+        max_val = df_total[col].max()
+        min_val = df_total[col].min()
+        print(f"  {col}: mean={mean_val:.1f}, range={min_val:.1f}-{max_val:.1f}")
+        
+        # Basic sanity checks
+        if 'circumference' in col and (mean_val > 200 or mean_val < 20):
+            print(f"    ❌ WARNING: {col} mean ({mean_val:.1f}) looks unreasonable!")
+        elif 'breadth' in col and (mean_val > 100 or mean_val < 10):
+            print(f"    ❌ WARNING: {col} mean ({mean_val:.1f}) looks unreasonable!")
+        else:
+            print(f"    ✅ Looks reasonable")
+    
     return df_total
 
 def load_images():
     """
-    Loads images from .npz files and concatenates them.
-    Images are loaded from ANSURI2023 and ANSURII2023 datasets for both genders.
-
-    Returns:
-        Tuple of numpy arrays :
-            - imgX_front (numpy array) : concatenated front view images.
-            - imgX_side (numpy array) : concatenated side view images.
+    Loads images from .npz files that correspond to the TOTAL datasets.
+    Images are loaded from ANSURI and ANSURII datasets for both genders and combined.
     """
+    print("Loading silhouette images...")
 
     img_ansuri = [[] for x in range(2)]  # 0-female, 1-male
     img_ansurii = [[] for x in range(2)]  # 0-female, 1-male
@@ -444,6 +464,16 @@ def load_images():
 
         if not os.path.exists(npz_path):
             print(f"ERROR: NPZ file {npz_path} does not exist!")
+            print("Available NPZ directories:")
+            import glob
+            available_dirs = glob.glob(os.path.join(SIL_FILES_DIR_npy, "*"))
+            for d in available_dirs:
+                if os.path.isdir(d):
+                    print(f"  - {os.path.basename(d)}")
+                    # List files in each directory
+                    files = glob.glob(os.path.join(d, "*.npz"))[:5]  # Show first 5 files
+                    for f in files:
+                        print(f"    * {os.path.basename(f)}")
             sys.exit(1)
 
         print(f"Loading ANSURI {gender}: {npz_path}")
@@ -464,6 +494,16 @@ def load_images():
 
         if not os.path.exists(npz_path):
             print(f"ERROR: NPZ file {npz_path} does not exist!")
+            print("Available NPZ directories:")
+            import glob
+            available_dirs = glob.glob(os.path.join(SIL_FILES_DIR_npy, "*"))
+            for d in available_dirs:
+                if os.path.isdir(d):
+                    print(f"  - {os.path.basename(d)}")
+                    # List files in each directory
+                    files = glob.glob(os.path.join(d, "*.npz"))[:5]  # Show first 5 files
+                    for f in files:
+                        print(f"    * {os.path.basename(f)}")
             sys.exit(1)
 
         print(f"Loading ANSURII {gender}: {npz_path}")
@@ -476,24 +516,13 @@ def load_images():
             img_ansuri[g].append(img_ansuri_npz["arr_0"][i, :, :, :])
             img_ansurii[g].append(img_ansurii_npz["arr_0"][i, :, :, :])
 
+        # Clean up individual NPZ files from memory
+        del img_ansuri_npz, img_ansurii_npz
+        gc.collect()
+
     print(f"Total image samples loaded: {total_samples}")
 
-    # ... rest of the function remains the same ...
-    
-    ## DELETE to free memory
-    try:
-        del img_ansuri_npz
-    except NameError:
-        print("img_ansuri_npz was already deleted")
-
-    try:
-        del img_ansurii_npz
-    except NameError:
-        print("img_ansurii_npz was already deleted")
-
-    gc.collect()
-
-    ## Concatenate NPYarrays
+    ## Concatenate NPY arrays (ANSURI + ANSURII for each gender)
     imgX_front_female = np.concatenate((img_ansuri[0][0], img_ansurii[0][0]), axis=0)
     imgX_front_male = np.concatenate((img_ansuri[1][0], img_ansurii[1][0]), axis=0)
 
@@ -506,19 +535,11 @@ def load_images():
     print(f"  - Side female: {imgX_side_female.shape}") 
     print(f"  - Side male: {imgX_side_male.shape}")
 
-    ## DELETE to free memory
-    try:
-        del img_ansuri
-    except NameError:
-        print("img_ansuri was already deleted")
-
-    try:
-        del img_ansurii
-    except NameError:
-        print("img_ansurii was already deleted")
-
+    ## Clean up intermediate arrays
+    del img_ansuri, img_ansurii
     gc.collect()
 
+    # Final concatenation (Female + Male for each view)
     imgX_front = np.concatenate((imgX_front_female, imgX_front_male), axis=0)
     imgX_side = np.concatenate((imgX_side_female, imgX_side_male), axis=0)
 
@@ -526,26 +547,9 @@ def load_images():
     print(f"  - imgX_front: {imgX_front.shape}")
     print(f"  - imgX_side: {imgX_side.shape}")
 
-    ## DELETE to free memory
-    try:
-        del imgX_front_female
-    except NameError:
-        print("imgX_front_female was already deleted")
-
-    try:
-        del imgX_front_male
-    except NameError:
-        print("imgX_front_male was already deleted")
-
-    try:
-        del imgX_side_female
-    except NameError:
-        print("imgX_side_female was already deleted")
-
-    try:
-        del imgX_side_male
-    except NameError:
-        print("imgX_side_male was already deleted")
+    ## Clean up final intermediate arrays
+    del imgX_front_female, imgX_front_male, imgX_side_female, imgX_side_male
+    gc.collect()
 
     return imgX_front, imgX_side
 
