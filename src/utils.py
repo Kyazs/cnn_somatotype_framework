@@ -107,7 +107,6 @@ SIL_FILES_DIR_DICT = {
 ##Extractor##
 KN_MEAS = [
     "gender",
-    "stature_cm",
 ]
 
 UK_MEAS = [
