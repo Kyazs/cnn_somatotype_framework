@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import gc  # Garbage Collector - use it like gc.collect()
 import joblib
+import pickle
 import matplotlib.pyplot as plt
 
 import tensorflow as tf
@@ -776,8 +777,12 @@ def process_db_values(df, train, test):
     trainX = np.hstack([trainCategorical, trainContinuous])
     testX = np.hstack([testCategorical, testContinuous])
 
-    # Save the scaler
-    joblib.dump(cs, TOT_SCALER_DIR)
+    # Save the scaler using pickle with protocol=4 for better compatibility
+    # Protocol 4 is compatible with Python 3.4+ and provides better cross-version support
+    print(f"Saving scaler to: {TOT_SCALER_DIR}")
+    with open(TOT_SCALER_DIR, 'wb') as f:
+        pickle.dump(cs, f, protocol=4)
+    print(f"✅ Scaler saved successfully with pickle protocol=4")
 
     # return the concatenated training and testing data
     return (trainX, testX), cs
