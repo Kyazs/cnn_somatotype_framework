@@ -57,6 +57,8 @@ ANSURI_COLS = [
     "ANKLE_CIRC",
     "BIACROMIAL_BRTH",
     "KNEE_HT_-_SITTING",
+    "CALF_CIRC",
+    "ARMCIRCBCPS_FLEX",
 ]
 
 ANSURII_COLS = [
@@ -69,6 +71,8 @@ ANSURII_COLS = [
     "anklecircumference",
     "biacromialbreadth",
     "kneeheightsitting",
+    "calfcircumference",
+    "bicepscircumferenceflexed"
 ]
 
 # 3. Create dictionaries to map the original names to your new standardized names.
