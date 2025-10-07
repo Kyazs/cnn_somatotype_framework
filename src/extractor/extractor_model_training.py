@@ -388,36 +388,39 @@ def load_databases():
     print(f"  - Male: {len(df_male)} samples")
     print(f"  - Columns: {list(df_female.columns)}")
     
+    # Combine datasets first (before filtering columns)
+    df_total = pd.concat([df_female, df_male], axis=0, ignore_index=True)
+    
+    # Define required columns - remove duplicates while preserving order
+    # (stature_cm appears in both UK_MEAS and KN_MEAS)
+    all_required_cols = UK_MEAS + KN_MEAS
+    required_cols = list(dict.fromkeys(all_required_cols))  # Remove duplicates, preserve order
+    
     # Verify we have the required columns
-    required_cols = UK_MEAS + KN_MEAS
-    missing_cols = set(required_cols) - set(df_female.columns)
+    missing_cols = set(required_cols) - set(df_total.columns)
     if missing_cols:
         print(f"ERROR: Missing required columns: {missing_cols}")
-        print(f"Available columns: {list(df_female.columns)}")
+        print(f"Available columns: {list(df_total.columns)}")
         print(f"Required columns: {required_cols}")
         sys.exit(1)
     
-    # Remove unwanted columns (keep only what we need)
-    keep_cols = UK_MEAS + KN_MEAS + ["gender"]
-    df_female = df_female[keep_cols]
-    df_male = df_male[keep_cols]
+    # Keep only required columns (no duplicates now!)
+    keep_cols = list(dict.fromkeys(UK_MEAS + KN_MEAS))
+    df_total = df_total[keep_cols].copy()
     
     # Apply test file limitation if needed
     if TEST_FILES == True:
         print(f"TEST MODE: Limiting to {TEST_FILES_NUM} samples per gender")
-        df_female = df_female.head(TEST_FILES_NUM)
-        df_male = df_male.head(TEST_FILES_NUM)
-
-    # Combine datasets
-    df_total = pd.concat([df_female, df_male], axis=0, ignore_index=True)
+        df_total = df_total.head(TEST_FILES_NUM * 2)  # 2 genders
     
     print(f"Combined dataset: {len(df_total)} samples")
     print(f"UK_MEAS (output): {UK_MEAS}")
     print(f"KN_MEAS (input): {KN_MEAS}")
+    print(f"Final columns (no duplicates): {list(df_total.columns)}")
     
     # Print statistics for verification
     print("\nDataset statistics:")
-    print(df_total[UK_MEAS].describe())
+    print(df_total.describe())
     
     # Verify the data looks reasonable
     print("\nVerifying data quality:")
