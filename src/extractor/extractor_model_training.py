@@ -826,9 +826,21 @@ def process_db_values(df, train, test):
         tuple: Tuple containing the processed training and testing data, and the MinMaxScaler (or StandardScaler) object.
     """
 
-    cs = SCALER
-    trainContinuous = cs.fit_transform(train[ACTIVE_CONTINUOUS])
-    testContinuous = cs.transform(test[ACTIVE_CONTINUOUS])  # test[KN_MEAS - CATEGORICAL]
+    # Handle continuous features (may be empty for Height Predictor)
+    if len(ACTIVE_CONTINUOUS) > 0:
+        cs = SCALER
+        trainContinuous = cs.fit_transform(train[ACTIVE_CONTINUOUS])
+        testContinuous = cs.transform(test[ACTIVE_CONTINUOUS])
+        
+        # Save the scaler
+        joblib.dump(cs, TOT_SCALER_DIR)
+        print(f"✅ Scaler fitted and saved with {len(ACTIVE_CONTINUOUS)} continuous feature(s)")
+    else:
+        # No continuous features - create empty arrays
+        trainContinuous = np.zeros((len(train), 0))
+        testContinuous = np.zeros((len(test), 0))
+        cs = None  # No scaler needed
+        print(f"✅ No continuous features - scaler not needed (Height Predictor mode)")
 
     # one-hot encode the GENDER categorical data (by definition of
     # one-hot encoding, all output features are now in the range [0, 1])
@@ -843,9 +855,6 @@ def process_db_values(df, train, test):
     # the categorical features with the continuous features
     trainX = np.hstack([trainCategorical, trainContinuous])
     testX = np.hstack([testCategorical, testContinuous])
-
-    # Save the scaler
-    joblib.dump(cs, TOT_SCALER_DIR)
 
     # return the concatenated training and testing data
     return (trainX, testX), cs
