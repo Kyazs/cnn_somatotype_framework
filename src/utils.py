@@ -112,7 +112,6 @@ KN_MEAS = [
 
 UK_MEAS = [
     # Updated to match the required extractor measurements
-    "stature_cm",                    # Stature
     "chest_circumference",           # Chest_Circumference  
     "buttock_circumference",         # Hip_Circumference (using buttock as proxy)
     "waist_circumference",           # Waist_Circumference
