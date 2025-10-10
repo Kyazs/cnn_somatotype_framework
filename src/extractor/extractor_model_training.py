@@ -67,7 +67,7 @@ SIL_FILES_DIR_npy = os.path.join(DS_DIR, f"silhouettes_blender{IMG_SIZE_4NN}_npy
 #   "height_predictor" - Train height prediction model (images → height)
 #   "measurement_extractor" - Train measurement extraction model (images + height → measurements)
 
-TRAIN_MODE = "measurement_extractor"  # Change this to switch models
+TRAIN_MODE = "height_predictor"  # Change this to switch models
 
 # Height Predictor Configuration
 HEIGHT_PREDICTOR_KN_MEAS = ["gender"]  # Input: ONLY gender, NO height
@@ -889,9 +889,9 @@ def createMLP_model(in_MLPlayers=1):
 
     # For mixed precision, ensure output layer uses float32
     if tf.keras.mixed_precision.global_policy().name == 'mixed_float16':
-        mlp_output = Dense(len(UK_MEAS), activation="linear", name="mlp_output", dtype='float32')(mlp_hidden)
+        mlp_output = Dense(len(ACTIVE_UK_MEAS), activation="linear", name="mlp_output", dtype='float32')(mlp_hidden)
     else:
-        mlp_output = Dense(len(UK_MEAS), activation="linear", name="mlp_output")(mlp_hidden)
+        mlp_output = Dense(len(ACTIVE_UK_MEAS), activation="linear", name="mlp_output")(mlp_hidden)
 
     ##returns model
     return Model(mlp_input, mlp_output)
@@ -963,11 +963,11 @@ def createCNN_model(in_CNNlayers=1, in_DENSElayers=0):
 
     # For mixed precision, ensure output layer uses float32
     if tf.keras.mixed_precision.global_policy().name == 'mixed_float16':
-        cnn_output = Dense(len(UK_MEAS), activation="linear", name="cnn_output", dtype='float32')(
+        cnn_output = Dense(len(ACTIVE_UK_MEAS), activation="linear", name="cnn_output", dtype='float32')(
             dense_hidden
         )
     else:
-        cnn_output = Dense(len(UK_MEAS), activation="linear", name="cnn_output")(
+        cnn_output = Dense(len(ACTIVE_UK_MEAS), activation="linear", name="cnn_output")(
             dense_hidden
         )
 
@@ -1024,16 +1024,16 @@ def createCombined_model(MLP_model, CNN_model):
 
     ## Our final FC layer head will have X dense layers, the final one being our regression head
     combined_hidden = Dense(
-        len(UK_MEAS) * 2, activation="relu", name="combined_hidden"
+        len(ACTIVE_UK_MEAS) * 2, activation="relu", name="combined_hidden"
     )(combinedInput)
 
     # For mixed precision, ensure output layer uses float32
     if tf.keras.mixed_precision.global_policy().name == 'mixed_float16':
-        combinedOutput = Dense(len(UK_MEAS), activation="linear", name="combined_output", dtype='float32')(
+        combinedOutput = Dense(len(ACTIVE_UK_MEAS), activation="linear", name="combined_output", dtype='float32')(
             combined_hidden
         )
     else:
-        combinedOutput = Dense(len(UK_MEAS), activation="linear", name="combined_output")(
+        combinedOutput = Dense(len(ACTIVE_UK_MEAS), activation="linear", name="combined_output")(
             combined_hidden
         )
 
