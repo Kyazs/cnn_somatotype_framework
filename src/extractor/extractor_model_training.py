@@ -60,89 +60,21 @@ from utils import *
 
 SIL_FILES_DIR_npy = os.path.join(DS_DIR, f"silhouettes_blender{IMG_SIZE_4NN}_npy")
 
-#############################################
-### MODEL CONFIGURATION OVERRIDE
-#############################################
-# Set TRAIN_MODE to choose which model to train:
-#   "height_predictor" - Train height prediction model (images → height)
-#   "measurement_extractor" - Train measurement extraction model (images + height → measurements)
-
-TRAIN_MODE = "height_predictor"  # Change this to switch models
-
-# Height Predictor Configuration
-HEIGHT_PREDICTOR_KN_MEAS = ["gender"]  # Input: ONLY gender, NO height
-HEIGHT_PREDICTOR_UK_MEAS = ["stature_cm"]  # Output: ONLY height
-HEIGHT_PREDICTOR_CONTINUOUS = []  # No continuous inputs
-HEIGHT_PREDICTOR_CATEGORICAL = ["gender"]  # Gender is categorical
-
-# Measurement Extractor Configuration
-MEASUREMENT_EXTRACTOR_KN_MEAS = ["gender", "stature_cm"]  # Input: gender + HEIGHT
-MEASUREMENT_EXTRACTOR_UK_MEAS = [  # Output: 9 measurements (NO stature_cm!)
-    "chest_circumference",
-    "buttock_circumference",
-    "waist_circumference",
-    "thigh_circumference",
-    "ankle_circumference",
-    "biacromial_breadth",
-    "knee_height_sitting",
-    "arm_circumference_flexed",
-    "calf_circumference",
-]
-MEASUREMENT_EXTRACTOR_CONTINUOUS = ["stature_cm"]  # Height is continuous input
-MEASUREMENT_EXTRACTOR_CATEGORICAL = ["gender"]  # Gender is categorical
-
-# Apply configuration based on TRAIN_MODE
-if TRAIN_MODE == "height_predictor":
-    ACTIVE_KN_MEAS = HEIGHT_PREDICTOR_KN_MEAS
-    ACTIVE_UK_MEAS = HEIGHT_PREDICTOR_UK_MEAS
-    ACTIVE_CONTINUOUS = HEIGHT_PREDICTOR_CONTINUOUS
-    ACTIVE_CATEGORICAL = HEIGHT_PREDICTOR_CATEGORICAL
-    MODEL_PREFIX = "heightPredictor"
-    print("\n" + "="*80)
-    print("🎯 TRAINING MODE: HEIGHT PREDICTOR")
-    print("="*80)
-    print(f"Input:  {ACTIVE_KN_MEAS} + images")
-    print(f"Output: {ACTIVE_UK_MEAS}")
-    print("This model will predict height from images WITHOUT height as input")
-    print("="*80 + "\n")
-elif TRAIN_MODE == "measurement_extractor":
-    ACTIVE_KN_MEAS = MEASUREMENT_EXTRACTOR_KN_MEAS
-    ACTIVE_UK_MEAS = MEASUREMENT_EXTRACTOR_UK_MEAS
-    ACTIVE_CONTINUOUS = MEASUREMENT_EXTRACTOR_CONTINUOUS
-    ACTIVE_CATEGORICAL = MEASUREMENT_EXTRACTOR_CATEGORICAL
-    MODEL_PREFIX = "measurementExtractor"
-    print("\n" + "="*80)
-    print("📏 TRAINING MODE: MEASUREMENT EXTRACTOR")
-    print("="*80)
-    print(f"Input:  {ACTIVE_KN_MEAS} + images")
-    print(f"Output: {ACTIVE_UK_MEAS}")
-    print("This model will predict measurements using height as input (NOT output)")
-    print("="*80 + "\n")
-else:
-    raise ValueError(f"Invalid TRAIN_MODE: {TRAIN_MODE}. Must be 'height_predictor' or 'measurement_extractor'")
-
-# Verify no data leakage
-overlap = set(ACTIVE_KN_MEAS) & set(ACTIVE_UK_MEAS)
-if overlap:
-    raise ValueError(f"❌ DATA LEAKAGE DETECTED! Variables in BOTH input and output: {overlap}")
-else:
-    print(f"✅ No data leakage - no overlap between inputs and outputs\n")
-
-## Load scaler (name based on model type)
+## Load scaler
 if TEST_FILES == True:
     if isinstance(SCALER, StandardScaler):
         TOT_SCALER_DIR = os.path.join(
-            MODEL_FILES_DIR, f"scalerStd_{TEST_FILES_NUM}_{MODEL_PREFIX}_test.pkl"
+            MODEL_FILES_DIR, f"scalerStd_{TEST_FILES_NUM}_extractor_test.pkl"
         )
     else:
         TOT_SCALER_DIR = os.path.join(
-            MODEL_FILES_DIR, f"scalerMinMax_{TEST_FILES_NUM}_{MODEL_PREFIX}_test.pkl"
+            MODEL_FILES_DIR, f"scalerMinMax_{TEST_FILES_NUM}_extractor_test.pkl"
         )
 else:
     if isinstance(SCALER, StandardScaler):
-        TOT_SCALER_DIR = os.path.join(MODEL_FILES_DIR, f"scalerStd_{MODEL_PREFIX}.pkl")
+        TOT_SCALER_DIR = os.path.join(MODEL_FILES_DIR, "scalerStd_extractor.pkl")
     else:
-        TOT_SCALER_DIR = os.path.join(MODEL_FILES_DIR, f"scalerMinMax_{MODEL_PREFIX}.pkl")
+        TOT_SCALER_DIR = os.path.join(MODEL_FILES_DIR, "scalerMinMax_extractor.pkl")
 
 
 def main():
@@ -203,10 +135,10 @@ def main():
     gc.collect()
 
     ## Normalize the UNKNOWN MEASUREMENTS (labels) - will lead to better training and convergence
-    trainMeasY = (trainData[ACTIVE_UK_MEAS] - df_total[ACTIVE_UK_MEAS].mean()) / df_total[
-        ACTIVE_UK_MEAS
+    trainMeasY = (trainData[UK_MEAS] - df_total[UK_MEAS].mean()) / df_total[
+        UK_MEAS
     ].std()
-    testMeasY = (testData[ACTIVE_UK_MEAS] - df_total[ACTIVE_UK_MEAS].mean()) / df_total[ACTIVE_UK_MEAS].std()
+    testMeasY = (testData[UK_MEAS] - df_total[UK_MEAS].mean()) / df_total[UK_MEAS].std()
 
     ## Scales Train and Test values
     (trainMeasX, testMeasX), dataMeasX_scaler = process_db_values(
@@ -216,7 +148,7 @@ def main():
     global INP_SHAPE
     INP_SHAPE = trainMeasX.shape[1]
 
-    if "gender" not in ACTIVE_KN_MEAS:
+    if "gender" not in KN_MEAS:
         trainMeasX = np.delete(trainMeasX, 0, 1)
         testMeasX = np.delete(testMeasX, 0, 1)
 
@@ -369,14 +301,14 @@ def main():
 
     if TEST_FILES == True:
         if isinstance(SCALER, StandardScaler):
-            MODEL_NAME = f"{MODEL_PREFIX}_stdScal_img{IMG_SIZE_4NN}_inp{len(ACTIVE_KN_MEAS)}_out{len(ACTIVE_UK_MEAS)}_ep{final_epochs}_{TEST_FILES_NUM}test"
+            MODEL_NAME = f"extractor_stdScal_img{IMG_SIZE_4NN}_inp{len(KN_MEAS)}_out{len(UK_MEAS)}_ep{final_epochs}_{TEST_FILES_NUM}test"
         else:
-            MODEL_NAME = f"{MODEL_PREFIX}_minMax_img{IMG_SIZE_4NN}_inp{len(ACTIVE_KN_MEAS)}_out{len(ACTIVE_UK_MEAS)}_ep{final_epochs}_{TEST_FILES_NUM}test"
+            MODEL_NAME = f"extractor_minMax_img{IMG_SIZE_4NN}_inp{len(KN_MEAS)}_out{len(UK_MEAS)}_ep{final_epochs}_{TEST_FILES_NUM}test"
     else:
         if isinstance(SCALER, StandardScaler):
-            MODEL_NAME = f"{MODEL_PREFIX}_stdScal_img{IMG_SIZE_4NN}_inp{len(ACTIVE_KN_MEAS)}_out{len(ACTIVE_UK_MEAS)}_ep{final_epochs}"
+            MODEL_NAME = f"extractor_stdScal_img{IMG_SIZE_4NN}_inp{len(KN_MEAS)}_out{len(UK_MEAS)}_ep{final_epochs}"
         else:
-            MODEL_NAME = f"{MODEL_PREFIX}_minMax_img{IMG_SIZE_4NN}_inp{len(ACTIVE_KN_MEAS)}_out{len(ACTIVE_UK_MEAS)}_ep{final_epochs}"
+            MODEL_NAME = f"extractor_minMax_img{IMG_SIZE_4NN}_inp{len(KN_MEAS)}_out{len(UK_MEAS)}_ep{final_epochs}"
 
     MODEL_NAME_SV = MODEL_NAME + ".keras"
     Combined_model.save(os.path.join(MODEL_FILES_DIR, MODEL_NAME_SV))
@@ -461,7 +393,7 @@ def load_databases():
     
     # Define required columns - remove duplicates while preserving order
     # (stature_cm appears in both UK_MEAS and KN_MEAS)
-    all_required_cols = ACTIVE_UK_MEAS + ACTIVE_KN_MEAS
+    all_required_cols = UK_MEAS + KN_MEAS
     required_cols = list(dict.fromkeys(all_required_cols))  # Remove duplicates, preserve order
     
     # Verify we have the required columns
@@ -473,7 +405,7 @@ def load_databases():
         sys.exit(1)
     
     # Keep only required columns (no duplicates now!)
-    keep_cols = list(dict.fromkeys(ACTIVE_UK_MEAS + ACTIVE_KN_MEAS))
+    keep_cols = list(dict.fromkeys(UK_MEAS + KN_MEAS))
     df_total = df_total[keep_cols].copy()
     
     # Apply test file limitation if needed
@@ -482,8 +414,8 @@ def load_databases():
         df_total = df_total.head(TEST_FILES_NUM * 2)  # 2 genders
     
     print(f"Combined dataset: {len(df_total)} samples")
-    print(f"ACTIVE_UK_MEAS (output): {ACTIVE_UK_MEAS}")
-    print(f"ACTIVE_KN_MEAS (input): {ACTIVE_KN_MEAS}")
+    print(f"UK_MEAS (output): {UK_MEAS}")
+    print(f"KN_MEAS (input): {KN_MEAS}")
     print(f"Final columns (no duplicates): {list(df_total.columns)}")
     
     # Print statistics for verification
@@ -492,7 +424,7 @@ def load_databases():
     
     # Verify the data looks reasonable
     print("\nVerifying data quality:")
-    for col in ACTIVE_UK_MEAS:
+    for col in UK_MEAS:
         mean_val = df_total[col].mean()
         max_val = df_total[col].max()
         min_val = df_total[col].min()
@@ -826,35 +758,26 @@ def process_db_values(df, train, test):
         tuple: Tuple containing the processed training and testing data, and the MinMaxScaler (or StandardScaler) object.
     """
 
-    # Handle continuous features (may be empty for Height Predictor)
-    if len(ACTIVE_CONTINUOUS) > 0:
-        cs = SCALER
-        trainContinuous = cs.fit_transform(train[ACTIVE_CONTINUOUS])
-        testContinuous = cs.transform(test[ACTIVE_CONTINUOUS])
-        
-        # Save the scaler
-        joblib.dump(cs, TOT_SCALER_DIR)
-        print(f"✅ Scaler fitted and saved with {len(ACTIVE_CONTINUOUS)} continuous feature(s)")
-    else:
-        # No continuous features - create empty arrays
-        trainContinuous = np.zeros((len(train), 0))
-        testContinuous = np.zeros((len(test), 0))
-        cs = None  # No scaler needed
-        print(f"✅ No continuous features - scaler not needed (Height Predictor mode)")
+    cs = SCALER
+    trainContinuous = cs.fit_transform(train[CONTINUOUS])
+    testContinuous = cs.transform(test[CONTINUOUS])  # test[KN_MEAS - CATEGORICAL]
 
     # one-hot encode the GENDER categorical data (by definition of
     # one-hot encoding, all output features are now in the range [0, 1])
     trainCategorical = keras.utils.to_categorical(
-        train[ACTIVE_CATEGORICAL], len(GENDER_DICT.keys())
+        train[CATEGORICAL], len(GENDER_DICT.keys())
     )
     testCategorical = keras.utils.to_categorical(
-        test[ACTIVE_CATEGORICAL], len(GENDER_DICT.keys())
+        test[CATEGORICAL], len(GENDER_DICT.keys())
     )
 
     # construct our training and testing data points by concatenating
     # the categorical features with the continuous features
     trainX = np.hstack([trainCategorical, trainContinuous])
     testX = np.hstack([testCategorical, testContinuous])
+
+    # Save the scaler
+    joblib.dump(cs, TOT_SCALER_DIR)
 
     # return the concatenated training and testing data
     return (trainX, testX), cs
@@ -889,9 +812,9 @@ def createMLP_model(in_MLPlayers=1):
 
     # For mixed precision, ensure output layer uses float32
     if tf.keras.mixed_precision.global_policy().name == 'mixed_float16':
-        mlp_output = Dense(len(ACTIVE_UK_MEAS), activation="linear", name="mlp_output", dtype='float32')(mlp_hidden)
+        mlp_output = Dense(len(UK_MEAS), activation="linear", name="mlp_output", dtype='float32')(mlp_hidden)
     else:
-        mlp_output = Dense(len(ACTIVE_UK_MEAS), activation="linear", name="mlp_output")(mlp_hidden)
+        mlp_output = Dense(len(UK_MEAS), activation="linear", name="mlp_output")(mlp_hidden)
 
     ##returns model
     return Model(mlp_input, mlp_output)
@@ -963,11 +886,11 @@ def createCNN_model(in_CNNlayers=1, in_DENSElayers=0):
 
     # For mixed precision, ensure output layer uses float32
     if tf.keras.mixed_precision.global_policy().name == 'mixed_float16':
-        cnn_output = Dense(len(ACTIVE_UK_MEAS), activation="linear", name="cnn_output", dtype='float32')(
+        cnn_output = Dense(len(UK_MEAS), activation="linear", name="cnn_output", dtype='float32')(
             dense_hidden
         )
     else:
-        cnn_output = Dense(len(ACTIVE_UK_MEAS), activation="linear", name="cnn_output")(
+        cnn_output = Dense(len(UK_MEAS), activation="linear", name="cnn_output")(
             dense_hidden
         )
 
@@ -1024,16 +947,16 @@ def createCombined_model(MLP_model, CNN_model):
 
     ## Our final FC layer head will have X dense layers, the final one being our regression head
     combined_hidden = Dense(
-        len(ACTIVE_UK_MEAS) * 2, activation="relu", name="combined_hidden"
+        len(UK_MEAS) * 2, activation="relu", name="combined_hidden"
     )(combinedInput)
 
     # For mixed precision, ensure output layer uses float32
     if tf.keras.mixed_precision.global_policy().name == 'mixed_float16':
-        combinedOutput = Dense(len(ACTIVE_UK_MEAS), activation="linear", name="combined_output", dtype='float32')(
+        combinedOutput = Dense(len(UK_MEAS), activation="linear", name="combined_output", dtype='float32')(
             combined_hidden
         )
     else:
-        combinedOutput = Dense(len(ACTIVE_UK_MEAS), activation="linear", name="combined_output")(
+        combinedOutput = Dense(len(UK_MEAS), activation="linear", name="combined_output")(
             combined_hidden
         )
 
